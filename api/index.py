@@ -1,28 +1,49 @@
 import os
+import logging
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from supabase import create_client, Client
 from datetime import datetime
-import logging
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__, template_folder='../templates')
 CORS(app)
 
-# Supabase
+# ========== ПРОВЕРКА ПЕРЕМЕННЫХ ОКРУЖЕНИЯ ==========
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise RuntimeError("Missing SUPABASE_URL or SUPABASE_KEY")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ========== Вспомогательные функции ==========
+if not SUPABASE_URL or not SUPABASE_KEY:
+    logging.error("Missing SUPABASE_URL or SUPABASE_KEY environment variables")
+    # В режиме отладки можно вернуть ошибку, но для Vercel лучше не падать сразу
+    # Создадим заглушку, чтобы приложение запустилось, но все запросы к БД будут падать
+    supabase = None
+else:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    logging.info("Supabase client initialized")
+
+# ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 def get_gosb_by_slug(slug):
-    res = supabase.table('gosb').select('*').eq('slug', slug).execute()
-    return res.data[0] if res.data else None
+    if not supabase:
+        return None
+    try:
+        res = supabase.table('gosb').select('*').eq('slug', slug).execute()
+        return res.data[0] if res.data else None
+    except Exception as e:
+        logging.error(f"get_gosb_by_slug error: {e}")
+        return None
 
 def get_cities_by_gosb(gosb_id):
-    res = supabase.table('cities').select('id, name').eq('gosb_id', gosb_id).execute()
-    return res.data
+    if not supabase:
+        return []
+    try:
+        res = supabase.table('cities').select('id, name').eq('gosb_id', gosb_id).execute()
+        return res.data
+    except Exception as e:
+        logging.error(f"get_cities_by_gosb error: {e}")
+        return []
 
 def reverse_geocode(lat, lng):
     try:
@@ -43,10 +64,12 @@ def reverse_geocode(lat, lng):
                 return full
         return f"шир. {lat:.5f} • долг. {lng:.5f}"
     except Exception as e:
-        logging.error(f"Геокодинг ошибка: {e}")
+        logging.error(f"reverse_geocode error: {e}")
         return f"шир. {lat:.5f} • долг. {lng:.5f}"
 
 def fill_report_record(reg_id, reg_data, gosb_name):
+    if not supabase:
+        return
     purpose = reg_data['purpose']
     row = {
         'registration_id': reg_id,
@@ -65,9 +88,12 @@ def fill_report_record(reg_id, reg_data, gosb_name):
         row['module1'] = '40'
     elif purpose == 'ЕПП':
         row['epp'] = '8'
-    supabase.table('report').insert(row).execute()
+    try:
+        supabase.table('report').insert(row).execute()
+    except Exception as e:
+        logging.error(f"fill_report_record error: {e}")
 
-# ========== Маршруты ==========
+# ========== МАРШРУТЫ ==========
 @app.route('/')
 def dashboard():
     return render_template('dashboard.html')
@@ -82,6 +108,8 @@ def register_form(slug):
 
 @app.route('/api/register', methods=['POST'])
 def api_register():
+    if not supabase:
+        return jsonify({'status': 'error', 'message': 'База данных не настроена'}), 500
     data = request.get_json()
     fio = data.get('fio')
     city_id = data.get('city_id')
@@ -108,87 +136,96 @@ def api_register():
         'longitude': lng,
         'timestamp': datetime.utcnow().isoformat()
     }
-    result = supabase.table('registrations').insert(reg_data).execute()
-    if not result.data:
-        return jsonify({'status': 'error', 'message': 'Ошибка сохранения'}), 500
-
-    reg_id = result.data[0]['id']
-    fill_report_record(reg_id, reg_data, gosb['name'])
-
-    return jsonify({
-        'status': 'success',
-        'message': 'Регистрация успешна',
-        'address': address,
-        'timestamp': datetime.now().strftime('%d.%m.%Y %H:%M:%S')
-    })
+    try:
+        result = supabase.table('registrations').insert(reg_data).execute()
+        if not result.data:
+            return jsonify({'status': 'error', 'message': 'Ошибка сохранения'}), 500
+        reg_id = result.data[0]['id']
+        fill_report_record(reg_id, reg_data, gosb['name'])
+        return jsonify({
+            'status': 'success',
+            'message': 'Регистрация успешна',
+            'address': address,
+            'timestamp': datetime.now().strftime('%d.%m.%Y %H:%M:%S')
+        })
+    except Exception as e:
+        logging.error(f"Registration error: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/gosb-list')
 def get_gosb_list():
-    res = supabase.table('gosb').select('id, name').execute()
-    return jsonify(res.data)
+    if not supabase:
+        return jsonify([])
+    try:
+        res = supabase.table('gosb').select('id, name').execute()
+        return jsonify(res.data)
+    except Exception as e:
+        logging.error(f"gosb-list error: {e}")
+        return jsonify([])
 
 @app.route('/api/cities-by-gosb')
 def get_cities_by_gosb_name():
     gosb_name = request.args.get('gosb_name')
-    if not gosb_name:
+    if not gosb_name or not supabase:
         return jsonify([])
-    gosb_res = supabase.table('gosb').select('id').eq('name', gosb_name).execute()
-    if not gosb_res.data:
+    try:
+        gosb_res = supabase.table('gosb').select('id').eq('name', gosb_name).execute()
+        if not gosb_res.data:
+            return jsonify([])
+        gosb_id = gosb_res.data[0]['id']
+        cities_res = supabase.table('cities').select('name').eq('gosb_id', gosb_id).execute()
+        return jsonify([c['name'] for c in cities_res.data])
+    except Exception as e:
+        logging.error(f"cities-by-gosb error: {e}")
         return jsonify([])
-    gosb_id = gosb_res.data[0]['id']
-    cities_res = supabase.table('cities').select('name').eq('gosb_id', gosb_id).execute()
-    return jsonify([c['name'] for c in cities_res.data])
 
 @app.route('/api/report-data')
 def get_report_data():
-    # Получаем параметры фильтрации
+    if not supabase:
+        return jsonify([])
     gosb = request.args.get('gosb')
-    city = request.args.get('city')
     fio = request.args.get('fio')
     year = request.args.get('year')
     quarter = request.args.get('quarter')
     month = request.args.get('month')
-    exact_date = request.args.get('exact_date')  # формат YYYY-MM-DD
+    exact_date = request.args.get('exact_date')
 
-    # Начинаем с запроса к таблице report
-    query = supabase.table('report').select('*')
-
-    if gosb:
-        query = query.eq('gosb_name', gosb)
-    if fio:
-        query = query.ilike('fio', f'%{fio}%')
-    
-    # Фильтрация по дате
-    if exact_date:
-        # Точная дата
-        query = query.eq('timestamp::date', exact_date)
-    else:
-        if year:
-            query = query.eq(supabase.func.extract('year', 'timestamp'), year)
-        if quarter:
-            # quarter 1-4
-            start_month = (int(quarter)-1)*3 + 1
-            end_month = start_month + 2
-            query = query.gte(supabase.func.extract('month', 'timestamp'), start_month)
-            query = query.lte(supabase.func.extract('month', 'timestamp'), end_month)
-        if month:
-            query = query.eq(supabase.func.extract('month', 'timestamp'), month)
-
-    # Выполняем запрос
-    res = query.execute()
-    data = res.data
-
-    # Фильтрация по городу (city) – так как в report нет city_name, сделаем дополнительный запрос
-    # Можно было бы хранить city_name в report, но для простоты оставим как есть:
-    # Если city задан, то фильтруем по registrations -> cities, но это сложно.
-    # Поэтому пока что city фильтр не реализуем (будет игнорироваться).
-    # При желании можно расширить.
-    if city:
-        # Заглушка – предупреждение в лог
-        logging.warning("Фильтр по городу не реализован в /api/report-data")
-        pass
-
-    return jsonify(data)
+    try:
+        query = supabase.table('report').select('*')
+        if gosb:
+            query = query.eq('gosb_name', gosb)
+        if fio:
+            query = query.ilike('fio', f'%{fio}%')
+        # Фильтрация по дате – упрощённо (можно доработать)
+        res = query.execute()
+        data = res.data
+        # Фильтрация по дате на стороне Python (проще, чем возиться с SQL на Supabase)
+        filtered = []
+        for row in data:
+            ts = row.get('timestamp')
+            if not ts:
+                continue
+            # Парсим дату из ISO
+            try:
+                d = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+            except:
+                continue
+            if exact_date:
+                if d.date().isoformat() != exact_date:
+                    continue
+            if year and str(d.year) != year:
+                continue
+            if quarter:
+                q = (d.month - 1) // 3 + 1
+                if str(q) != quarter:
+                    continue
+            if month and str(d.month) != month:
+                continue
+            filtered.append(row)
+        return jsonify(filtered)
+    except Exception as e:
+        logging.error(f"report-data error: {e}")
+        return jsonify([])
 
 if __name__ == '__main__':
     app.run(debug=True)

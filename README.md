@@ -13,3 +13,9 @@
 | ЯНАО | [Перейти](https://registration-app.vercel.app/register/yanao) | ![QR](https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://registration-app.vercel.app/register/yanao) |
 | Тюменский ГОСБ | [Перейти](https://registration-app.vercel.app/register/tyumen) | ![QR](https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://registration-app.vercel.app/register/tyumen) |
 | Курганский ГОСБ | [Перейти](https://registration-app.vercel.app/register/kurgan) | ![QR](https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=https://registration-app.vercel.app/register/kurgan) |
+
+
+
+## 🧾 Все QR-коды
+
+[Открыть страницу со всеми QR-кодами](https://registration-app.vercel.app/qr.html)

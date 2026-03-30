@@ -61,9 +61,14 @@
             background: #f0f0f0;
             border-radius: 8px;
         }
-        .qr-card .download-btn {
-            display: inline-block;
+        .qr-card .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
             margin-top: 15px;
+        }
+        .qr-card .btn {
+            display: inline-block;
             padding: 8px 16px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -71,10 +76,16 @@
             border-radius: 10px;
             font-size: 14px;
             font-weight: 600;
+            transition: all 0.2s;
         }
-        .qr-card .download-btn:hover {
+        .qr-card .btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        .qr-card .btn-outline {
+            background: transparent;
+            border: 1px solid #667eea;
+            color: #667eea;
         }
         .footer {
             text-align: center;
@@ -86,7 +97,7 @@
             body { background: white; }
             h1 { color: #333; }
             .qr-card { break-inside: avoid; }
-            .download-btn { display: none; }
+            .btn { display: none; }
         }
     </style>
 </head>
@@ -130,7 +141,10 @@
                 <img src="${qrSrc}" alt="QR ${gosb.name}">
             </div>
             <div class="url">${url}</div>
-            <a href="${downloadUrl}" target="_blank" class="download-btn">📥 Скачать QR-код</a>
+            <div class="button-group">
+                <a href="${url}" target="_blank" class="btn">🔗 Перейти к форме</a>
+                <a href="${downloadUrl}" target="_blank" class="btn btn-outline">📥 Скачать QR</a>
+            </div>
         `;
         grid.appendChild(card);
     });

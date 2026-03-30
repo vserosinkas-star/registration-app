@@ -17,8 +17,6 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     logging.error("Missing SUPABASE_URL or SUPABASE_KEY environment variables")
-    # В режиме отладки можно вернуть ошибку, но для Vercel лучше не падать сразу
-    # Создадим заглушку, чтобы приложение запустилось, но все запросы к БД будут падать
     supabase = None
 else:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -27,9 +25,11 @@ else:
 # ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 def get_gosb_by_slug(slug):
     if not supabase:
+        logging.warning("Supabase client not initialized")
         return None
     try:
         res = supabase.table('gosb').select('*').eq('slug', slug).execute()
+        logging.info(f"get_gosb_by_slug({slug}) -> {res.data}")
         return res.data[0] if res.data else None
     except Exception as e:
         logging.error(f"get_gosb_by_slug error: {e}")
@@ -196,23 +196,20 @@ def get_report_data():
             query = query.eq('gosb_name', gosb)
         if fio:
             query = query.ilike('fio', f'%{fio}%')
-        # Фильтрация по дате – упрощённо (можно доработать)
         res = query.execute()
         data = res.data
-        # Фильтрация по дате на стороне Python (проще, чем возиться с SQL на Supabase)
+        # Фильтрация по дате на стороне Python
         filtered = []
         for row in data:
             ts = row.get('timestamp')
             if not ts:
                 continue
-            # Парсим дату из ISO
             try:
                 d = datetime.fromisoformat(ts.replace('Z', '+00:00'))
             except:
                 continue
-            if exact_date:
-                if d.date().isoformat() != exact_date:
-                    continue
+            if exact_date and d.date().isoformat() != exact_date:
+                continue
             if year and str(d.year) != year:
                 continue
             if quarter:
@@ -227,5 +224,17 @@ def get_report_data():
         logging.error(f"report-data error: {e}")
         return jsonify([])
 
+# ========== ОТЛАДОЧНЫЙ МАРШРУТ ==========
+@app.route('/api/debug-supabase')
+def debug_supabase():
+    if not supabase:
+        return jsonify({"error": "Supabase client not initialized", "env": {"SUPABASE_URL": bool(SUPABASE_URL), "SUPABASE_KEY": bool(SUPABASE_KEY)}}), 500
+    try:
+        res = supabase.table('gosb').select('*').limit(1).execute()
+        return jsonify({"status": "ok", "data": res.data})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ========== ЛОКАЛЬНЫЙ ЗАПУСК (не используется на Vercel) ==========
 if __name__ == '__main__':
     app.run(debug=True)

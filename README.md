@@ -18,4 +18,5 @@
 
 ## 🧾 Все QR-коды
 
-[Открыть страницу со всеми QR-кодами](https://registration-app.vercel.app/qr.html)
+[Открыть страницу со всеми QR-кодами](https://registration-app-sandy.vercel.app/qr.html)
+https://registration-app-sandy.vercel.app/register/apparat

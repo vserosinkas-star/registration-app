@@ -16,7 +16,7 @@
 
 ## 🧾 Все QR-коды на одной странице
 
-[Открыть страницу со всеми QR-кодами](https://registration-app-sandy.vercel.app/qr.html)
+[Открыть страницу со всеми QR-кодами](https://registration-app-sandy.vercel.app/public/qr.html)
 
 ## 🛠 Разработка
 

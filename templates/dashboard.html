@@ -19,15 +19,232 @@
     <script src="https://npmcdn.com/flatpickr/dist/l10n/ru.js"></script>
     
     <style>
-        /* ... все стили без изменений ... */
-        /* (скопируйте из предыдущей версии, они не менялись) */
+        /* Все стили остаются точно такими же, как в предыдущей версии */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f0c29 0%, #1a1a2e 50%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 2rem 1.5rem;
+            position: relative;
+            overflow-x: auto;
+        }
+        body::before {
+            content: ''; position: fixed; top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(circle at 70% 30%, rgba(108, 92, 231, 0.15) 0%, transparent 50%);
+            z-index: 0; pointer-events: none;
+        }
+        .container {
+            max-width: 1600px; margin: 0 auto; position: relative; z-index: 1;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            font-size: 2.5rem; font-weight: 700; margin-bottom: 1.5rem;
+            background: linear-gradient(90deg, #a8ede0, #fed6e3);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(168, 237, 224, 0.3);
+            letter-spacing: -0.02em;
+        }
+        .filters-card {
+            background: rgba(20, 20, 40, 0.7);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px; padding: 1.5rem; margin-bottom: 2rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            transition: all 0.3s ease;
+        }
+        .filters-grid {
+            display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;
+        }
+        .filter-item { flex: 1 1 180px; min-width: 160px; }
+        .filter-item label {
+            display: block; font-size: 0.8rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.05em;
+            color: #a0a0c0; margin-bottom: 0.4rem;
+        }
+        .filter-item select, .filter-item input {
+            width: 100%; padding: 0.7rem 1rem;
+            background: rgba(10, 10, 20, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px; font-family: 'Inter', sans-serif;
+            font-size: 0.95rem; color: #f0f0f0;
+            transition: all 0.2s; outline: none; backdrop-filter: blur(5px);
+        }
+        .filter-item select option { background: #1a1a2e; color: #fff; }
+        .filter-item input.flatpickr-input { 
+            cursor: pointer; 
+            background: rgba(10, 10, 20, 0.5) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236c5ce7' stroke-width='2'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E") no-repeat right 10px center;
+        }
+        .filter-item input:focus, .filter-item select:focus {
+            border-color: #6c5ce7; box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.3);
+        }
+        .filter-item input::placeholder { color: #6a6a8b; font-weight: 300; }
+        .filter-buttons { display: flex; gap: 1rem; align-items: center; margin-left: auto; }
+        .btn {
+            padding: 0.7rem 2rem; border: none; border-radius: 14px;
+            font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.95rem;
+            cursor: pointer; transition: all 0.2s;
+            background: linear-gradient(135deg, #6c5ce7, #a463f5);
+            color: white; box-shadow: 0 10px 20px -5px rgba(108, 92, 231, 0.4);
+            letter-spacing: 0.02em;
+        }
+        .btn-outline {
+            background: transparent; border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: none; color: #e0e0e0;
+        }
+        .btn-outline:hover { border-color: #6c5ce7; background: rgba(108, 92, 231, 0.1); }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 15px 25px -5px #6c5ce7; }
+        .table-card {
+            background: rgba(20, 20, 40, 0.6);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px; padding: 1.5rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4); overflow-x: auto;
+        }
+        #dataTable { width: 100% !important; border-collapse: separate; border-spacing: 0 8px; margin-top: 0.5rem; }
+        #dataTable thead th {
+            background: rgba(40, 40, 60, 0.8); color: #c0c0e0; font-weight: 600;
+            font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;
+            padding: 1rem 0.8rem; border: none; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        #dataTable tbody tr {
+            background: rgba(30, 30, 50, 0.6); border-radius: 16px;
+            transition: all 0.2s;
+        }
+        #dataTable tbody tr:hover {
+            background: rgba(50, 50, 80, 0.8); transform: scale(1.002);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        #dataTable td {
+            padding: 1rem 0.8rem; border: none; color: #e0e0f0;
+            font-size: 0.95rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        #dataTable tfoot { display: table-header-group; }
+        #dataTable tfoot th { background: transparent; padding: 0.8rem 0.5rem; border: none; }
+        #dataTable tfoot input {
+            width: 100%; padding: 0.5rem 0.8rem;
+            background: rgba(10, 10, 20, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px;
+            font-family: 'Inter', sans-serif; font-size: 0.85rem;
+            color: #f0f0f0; transition: all 0.2s; outline: none;
+        }
+        #dataTable tfoot input:focus {
+            border-color: #6c5ce7; box-shadow: 0 0 0 2px rgba(108, 92, 231, 0.3);
+        }
+        .dataTables_wrapper .dataTables_paginate .paginate_button {
+            background: rgba(40, 40, 60, 0.6); border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px; color: #e0e0e0 !important; margin: 0 3px; padding: 0.5rem 1rem;
+        }
+        .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+            background: #6c5ce7 !important; border-color: #6c5ce7; color: white !important;
+        }
+        .dataTables_wrapper .dataTables_length select,
+        .dataTables_wrapper .dataTables_filter input {
+            background: rgba(20, 20, 40, 0.6); border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px; color: #e0e0e0; padding: 0.4rem 1rem;
+        }
+        .dataTables_info, .dataTables_length { color: #a0a0c0 !important; }
+        
+        /* Счетчик записей */
+        .records-counter {
+            display: inline-block;
+            margin-left: 1rem;
+            padding: 0.3rem 0.8rem;
+            background: rgba(108, 92, 231, 0.2);
+            border: 1px solid rgba(108, 92, 231, 0.4);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: #a8ede0;
+            font-weight: 600;
+        }
+        .records-counter .total-count {
+            color: #fed6e3;
+            font-weight: 700;
+        }
+
+        /* flatpickr тёмная тема */
+        .flatpickr-calendar {
+            background: rgba(20, 20, 40, 0.95) !important;
+            border: 1px solid rgba(108, 92, 231, 0.3) !important;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5) !important;
+            border-radius: 16px !important;
+        }
+        .flatpickr-day { color: #e0e0e0 !important; }
+        .flatpickr-day:hover {
+            background: rgba(108, 92, 231, 0.3) !important;
+            border-color: rgba(108, 92, 231, 0.3) !important;
+        }
+        .flatpickr-day.selected {
+            background: #6c5ce7 !important;
+            border-color: #6c5ce7 !important;
+        }
+        .flatpickr-day.today {
+            border-color: #a8ede0 !important;
+            color: #a8ede0 !important;
+        }
+        .flatpickr-months .flatpickr-month {
+            background: rgba(20, 20, 40, 0.95) !important;
+            color: #e0e0e0 !important;
+        }
+        .flatpickr-months .flatpickr-prev-month,
+        .flatpickr-months .flatpickr-next-month {
+            color: #e0e0e0 !important;
+        }
+        .flatpickr-months .flatpickr-prev-month:hover,
+        .flatpickr-months .flatpickr-next-month:hover {
+            color: #6c5ce7 !important;
+        }
+        .flatpickr-weekdays { background: rgba(20, 20, 40, 0.95) !important; }
+        .flatpickr-weekday { color: #a0a0c0 !important; }
+        .flatpickr-time {
+            background: rgba(20, 20, 40, 0.95) !important;
+            border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+        .flatpickr-time input {
+            background: rgba(10, 10, 20, 0.5) !important;
+            color: #e0e0e0 !important;
+        }
+        .flatpickr-time .numInputWrapper span.arrowUp:after { border-bottom-color: #6c5ce7 !important; }
+        .flatpickr-time .numInputWrapper span.arrowDown:after { border-top-color: #6c5ce7 !important; }
+
+        @media (max-width: 768px) {
+            body { padding: 0.1rem; line-height: 1; }
+            h1 { font-size: 1rem; margin: 0.1rem 0; }
+            .filters-card { padding: 0.1rem; margin-bottom: 0.1rem; border-radius: 8px; }
+            .filters-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.1rem; align-items: stretch; }
+            .filter-item { min-width: auto; margin: 0; }
+            .filter-item:nth-child(1) { grid-column: 1; }
+            .filter-item:nth-child(2) { grid-column: 2; }
+            .filter-item:nth-child(3), .filter-item:nth-child(4), .filter-item:nth-child(5), 
+            .filter-item:nth-child(6), .filter-item:nth-child(7) { grid-column: 1 / -1; }
+            .filter-buttons { grid-column: 1 / -1; display: flex; gap: 0.1rem; margin-top: 0.1rem; width: 100%; }
+            .filter-item label { font-size: 0.45rem; margin: 0; padding: 0; line-height: 1; font-weight: 600; text-transform: uppercase; color: #a0a0c0; }
+            .filter-item select, .filter-item input { padding: 0.1rem 0.2rem; font-size: 0.6rem; border-radius: 4px; margin: 0; border-width: 1px; height: 1.5rem; }
+            .filter-item input.flatpickr-input { background-size: 12px; background-position: right 5px center; }
+            .btn { padding: 0.1rem 0.2rem; font-size: 0.55rem; flex: 1 1 auto; text-align: center; border-radius: 4px; margin: 0; box-shadow: none; border: 1px solid rgba(255,255,255,0.2); }
+            .table-card { padding: 0.1rem; }
+            #dataTable { font-size: 0.45rem; }
+            #dataTable thead th { padding: 0.1rem 0.05rem; font-size: 0.4rem; white-space: nowrap; }
+            #dataTable tbody td { padding: 0.1rem 0.05rem; font-size: 0.45rem; white-space: nowrap; }
+            #dataTable tfoot input { padding: 0.05rem 0.1rem; font-size: 0.4rem; }
+            .dataTables_wrapper .dataTables_paginate .paginate_button { padding: 0.05rem 0.1rem; font-size: 0.45rem; }
+            .dataTables_info, .dataTables_length { font-size: 0.4rem; }
+            .records-counter {
+                display: block;
+                margin: 0.1rem 0;
+                font-size: 0.4rem;
+                padding: 0.05rem 0.2rem;
+            }
+        }
+        @media (max-width: 480px) { #dataTable tfoot { display: none; } }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🧠 Сводная панель обучения (AI Edition)</h1>
 
-        <!-- Панель фильтров -->
         <div class="filters-card">
             <div class="filters-grid">
                 <div class="filter-item">
@@ -77,7 +294,6 @@
             </div>
         </div>
 
-        <!-- Карточка таблицы -->
         <div class="table-card">
             <table id="dataTable" class="display" style="width:100%">
                 <thead>
@@ -180,34 +396,19 @@
         const resp = await fetch(url);
         const data = await resp.json();
 
-        const tableData = data.map(row => {
-            let formattedDate = '';
-            if (row.timestamp) {
-                const date = new Date(row.timestamp);
-                // Прибавляем 5 часов для часового пояса Екатеринбурга (UTC+5)
-                date.setHours(date.getHours() + 5);
-                const day = String(date.getDate()).padStart(2, '0');
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const year = date.getFullYear();
-                const hours = String(date.getHours()).padStart(2, '0');
-                const minutes = String(date.getMinutes()).padStart(2, '0');
-                const seconds = String(date.getSeconds()).padStart(2, '0');
-                formattedDate = `${day}.${month}.${year} ${hours}:${minutes}:${seconds}`;
-            }
-            return [
-                formattedDate,
-                row.tab_number || '',
-                row.fio,
-                row.subdivision || '',
-                row.fire_training || '',
-                row.block_training || '',
-                row.radio_comm || '',
-                row.drills || '',
-                row.emergency || '',
-                row.module1 || '',
-                row.epp || ''
-            ];
-        });
+        const tableData = data.map(row => [
+            row.timestamp,                      // уже отформатированная дата на сервере
+            row.tab_number || '',
+            row.fio,
+            row.subdivision || '',              // теперь это KIC-ПИ
+            row.fire_training || '',
+            row.block_training || '',
+            row.radio_comm || '',
+            row.drills || '',
+            row.emergency || '',
+            row.module1 || '',
+            row.epp || ''
+        ]);
 
         if (table) {
             table.clear();

@@ -69,11 +69,24 @@ def fill_report_record(reg_id, reg_data, gosb_name):
     if not supabase:
         return
     purpose = reg_data['purpose']
+    
+    # Получаем данные сотрудника, если есть employee_id
+    employee_data = {}
+    if reg_data.get('employee_id'):
+        try:
+            emp_res = supabase.table('employees').select('tab_number, position, gosb_name').eq('id', reg_data['employee_id']).execute()
+            if emp_res.data:
+                employee_data = emp_res.data[0]
+        except Exception as e:
+            logging.error(f"Ошибка получения сотрудника: {e}")
+    
     row = {
         'registration_id': reg_id,
         'timestamp': reg_data['timestamp'],
         'fio': reg_data['fio'],
         'gosb_name': gosb_name,
+        'tab_number': employee_data.get('tab_number'),
+        'subdivision': employee_data.get('position'),  # используем должность как подразделение
         'fire_training': '0,5',
         'radio_comm': '0,5',
         'drills': '0,25'
@@ -115,7 +128,7 @@ def api_register():
     lat = data.get('latitude')
     lng = data.get('longitude')
     gosb_slug = data.get('gosb_slug')
-    employee_id = data.get('employee_id')  # может быть None
+    employee_id = data.get('employee_id')
 
     if not fio or not city_id or not purpose:
         return jsonify({'status': 'error', 'message': 'Не все поля заполнены'}), 400
@@ -133,11 +146,9 @@ def api_register():
         'address': address,
         'latitude': lat,
         'longitude': lng,
-        'timestamp': datetime.utcnow().isoformat()
+        'timestamp': datetime.utcnow().isoformat(),
+        'employee_id': employee_id if employee_id else None
     }
-    if employee_id:
-        reg_data['employee_id'] = employee_id
-
     try:
         result = supabase.table('registrations').insert(reg_data).execute()
         if not result.data:
@@ -200,6 +211,7 @@ def get_report_data():
             query = query.ilike('fio', f'%{fio}%')
         res = query.execute()
         data = res.data
+        # Фильтрация по дате на стороне Python
         filtered = []
         for row in data:
             ts = row.get('timestamp')
@@ -227,24 +239,30 @@ def get_report_data():
 
 @app.route('/api/employees/search')
 def search_employees():
-    """
-    Поиск сотрудников по ФИО (частичное совпадение).
-    Возвращает список объектов с полями id, fio, tab_number, position, gosb_name.
-    """
-    if not supabase:
-        return jsonify([])
     query = request.args.get('q', '').strip()
     limit = int(request.args.get('limit', 10))
     if not query:
         return jsonify([])
     try:
-        # Ищем по ФИО (без учёта регистра) – частичное совпадение
-        res = supabase.table('employees').select('id, fio, tab_number, position, gosb_name') \
-            .ilike('fio', f'%{query}%').limit(limit).execute()
+        if query.isdigit():
+            res = supabase.table('employees').select('id, fio, tab_number, position').eq('tab_number', query).limit(limit).execute()
+        else:
+            res = supabase.table('employees').select('id, fio, tab_number, position').ilike('fio', f'%{query}%').limit(limit).execute()
         return jsonify(res.data)
     except Exception as e:
-        logging.error(f"search_employees error: {e}")
+        logging.error(f"Ошибка поиска сотрудников: {e}")
         return jsonify([]), 500
+
+# ========== ОТЛАДОЧНЫЙ МАРШРУТ ==========
+@app.route('/api/debug-supabase')
+def debug_supabase():
+    if not supabase:
+        return jsonify({"error": "Supabase client not initialized", "env": {"SUPABASE_URL": bool(SUPABASE_URL), "SUPABASE_KEY": bool(SUPABASE_KEY)}}), 500
+    try:
+        res = supabase.table('gosb').select('*').limit(1).execute()
+        return jsonify({"status": "ok", "data": res.data})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

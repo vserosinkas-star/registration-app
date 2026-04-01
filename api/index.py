@@ -25,11 +25,9 @@ else:
 # ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 def get_gosb_by_slug(slug):
     if not supabase:
-        logging.warning("Supabase client not initialized")
         return None
     try:
         res = supabase.table('gosb').select('*').eq('slug', slug).execute()
-        logging.info(f"get_gosb_by_slug({slug}) -> {res.data}")
         return res.data[0] if res.data else None
     except Exception as e:
         logging.error(f"get_gosb_by_slug error: {e}")
@@ -117,6 +115,7 @@ def api_register():
     lat = data.get('latitude')
     lng = data.get('longitude')
     gosb_slug = data.get('gosb_slug')
+    employee_id = data.get('employee_id')  # может быть None
 
     if not fio or not city_id or not purpose:
         return jsonify({'status': 'error', 'message': 'Не все поля заполнены'}), 400
@@ -136,6 +135,9 @@ def api_register():
         'longitude': lng,
         'timestamp': datetime.utcnow().isoformat()
     }
+    if employee_id:
+        reg_data['employee_id'] = employee_id
+
     try:
         result = supabase.table('registrations').insert(reg_data).execute()
         if not result.data:
@@ -198,7 +200,6 @@ def get_report_data():
             query = query.ilike('fio', f'%{fio}%')
         res = query.execute()
         data = res.data
-        # Фильтрация по дате на стороне Python
         filtered = []
         for row in data:
             ts = row.get('timestamp')
@@ -224,17 +225,26 @@ def get_report_data():
         logging.error(f"report-data error: {e}")
         return jsonify([])
 
-# ========== ОТЛАДОЧНЫЙ МАРШРУТ ==========
-@app.route('/api/debug-supabase')
-def debug_supabase():
+@app.route('/api/employees/search')
+def search_employees():
+    """
+    Поиск сотрудников по ФИО (частичное совпадение).
+    Возвращает список объектов с полями id, fio, tab_number, position, gosb_name.
+    """
     if not supabase:
-        return jsonify({"error": "Supabase client not initialized", "env": {"SUPABASE_URL": bool(SUPABASE_URL), "SUPABASE_KEY": bool(SUPABASE_KEY)}}), 500
+        return jsonify([])
+    query = request.args.get('q', '').strip()
+    limit = int(request.args.get('limit', 10))
+    if not query:
+        return jsonify([])
     try:
-        res = supabase.table('gosb').select('*').limit(1).execute()
-        return jsonify({"status": "ok", "data": res.data})
+        # Ищем по ФИО (без учёта регистра) – частичное совпадение
+        res = supabase.table('employees').select('id, fio, tab_number, position, gosb_name') \
+            .ilike('fio', f'%{query}%').limit(limit).execute()
+        return jsonify(res.data)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logging.error(f"search_employees error: {e}")
+        return jsonify([]), 500
 
-# ========== ЛОКАЛЬНЫЙ ЗАПУСК (не используется на Vercel) ==========
 if __name__ == '__main__':
     app.run(debug=True)

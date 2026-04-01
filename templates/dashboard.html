@@ -19,7 +19,7 @@
     <script src="https://npmcdn.com/flatpickr/dist/l10n/ru.js"></script>
     
     <style>
-        /* Все стили остаются точно такими же, как в предыдущей версии */
+        /* все стили остаются без изменений (как в предыдущей версии) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Inter', sans-serif;
@@ -164,7 +164,7 @@
             font-weight: 700;
         }
 
-        /* flatpickr тёмная тема */
+        /* ========== СТИЛИ ДЛЯ FLATPICKR (тёмная тема) ========== */
         .flatpickr-calendar {
             background: rgba(20, 20, 40, 0.95) !important;
             border: 1px solid rgba(108, 92, 231, 0.3) !important;
@@ -209,6 +209,7 @@
         .flatpickr-time .numInputWrapper span.arrowUp:after { border-bottom-color: #6c5ce7 !important; }
         .flatpickr-time .numInputWrapper span.arrowDown:after { border-top-color: #6c5ce7 !important; }
 
+        /* ========== КОМПАКТНАЯ СЕТКА ДЛЯ МОБИЛЬНЫХ ========== */
         @media (max-width: 768px) {
             body { padding: 0.1rem; line-height: 1; }
             h1 { font-size: 1rem; margin: 0.1rem 0; }
@@ -245,6 +246,7 @@
     <div class="container">
         <h1>🧠 Сводная панель обучения (AI Edition)</h1>
 
+        <!-- Панель фильтров -->
         <div class="filters-card">
             <div class="filters-grid">
                 <div class="filter-item">
@@ -259,10 +261,12 @@
                     <label for="fioFilter">Ф.И.О.</label>
                     <input type="text" id="fioFilter" placeholder="Введите имя...">
                 </div>
+                <!-- Единый фильтр по дате с всплывающим календарём -->
                 <div class="filter-item">
                     <label for="datePicker">📅 Дата</label>
                     <input type="text" id="datePicker" class="flatpickr-input" placeholder="Выберите дату">
                 </div>
+                <!-- Дополнительные фильтры по дате -->
                 <div class="filter-item">
                     <label for="yearFilter">Год</label>
                     <select id="yearFilter"><option value="">Все годы</option></select>
@@ -290,10 +294,12 @@
                 <div class="filter-buttons">
                     <button class="btn" id="applyFilters">🔍 Применить</button>
                     <button class="btn btn-outline" id="resetFilters">↺ Сбросить</button>
+                    <button class="btn btn-outline" id="sendTodayReportBtn">📨 Отправить отчёт за сегодня</button>
                 </div>
             </div>
         </div>
 
+        <!-- Карточка таблицы -->
         <div class="table-card">
             <table id="dataTable" class="display" style="width:100%">
                 <thead>
@@ -337,6 +343,7 @@
         });
     }
 
+    // Загрузка городов при выборе ГОСБ
     document.getElementById('gosbSelect').addEventListener('change', async function() {
         const gosbName = this.value;
         const kicSelect = document.getElementById('kicSelect');
@@ -357,6 +364,7 @@
         kicSelect.disabled = false;
     });
 
+    // Инициализация flatpickr
     function initDatePicker() {
         datePicker = flatpickr("#datePicker", {
             locale: "ru",
@@ -366,6 +374,7 @@
         });
     }
 
+    // Форматирование даты для API (YYYY-MM-DD)
     function formatDateForApi(dateStr) {
         if (!dateStr) return null;
         const parts = dateStr.split('.');
@@ -373,6 +382,7 @@
         return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
 
+    // Загрузка данных таблицы с фильтрами
     async function loadTableData() {
         const gosb = document.getElementById('gosbSelect').value;
         const city = document.getElementById('kicSelect').value;
@@ -397,10 +407,10 @@
         const data = await resp.json();
 
         const tableData = data.map(row => [
-            row.timestamp,                      // уже отформатированная дата на сервере
+            row.timestamp,
             row.tab_number || '',
             row.fio,
-            row.subdivision || '',              // теперь это KIC-ПИ
+            row.subdivision || '',
             row.fire_training || '',
             row.block_training || '',
             row.radio_comm || '',
@@ -441,12 +451,14 @@
                 }
             });
             $('.dataTables_filter').hide();
+            // Добавляем счетчик записей
             const lengthDiv = $('.dataTables_length');
             if (lengthDiv.length && $('#recordsCounter').length === 0) {
                 lengthDiv.after('<span id="recordsCounter" class="records-counter">Всего: <span class="total-count">0</span> чел.</span>');
             }
         }
 
+        // Обновляем счетчик
         const filteredCount = table.rows({ search: 'applied' }).count();
         $('#recordsCounter .total-count').text(filteredCount);
     }
@@ -462,6 +474,27 @@
         if (datePicker) datePicker.clear();
         loadTableData();
     }
+
+    // Обработчик кнопки отправки отчёта за сегодня
+    document.getElementById('sendTodayReportBtn').addEventListener('click', async function() {
+        const btn = this;
+        btn.disabled = true;
+        btn.textContent = '⏳ Отправка...';
+        try {
+            const resp = await fetch('/api/send-today-report', { method: 'POST' });
+            const result = await resp.json();
+            if (result.status === 'ok') {
+                alert(`Отчёт отправлен! Отправлено: ${result.sent} из ${result.total_gosb} ГОСБ`);
+            } else {
+                alert('Ошибка: ' + (result.message || 'неизвестная ошибка'));
+            }
+        } catch (err) {
+            alert('Ошибка соединения: ' + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '📨 Отправить отчёт за сегодня';
+        }
+    });
 
     window.onload = async () => {
         initDatePicker();

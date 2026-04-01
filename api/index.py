@@ -16,7 +16,6 @@ CORS(app)
 # ========== ПРОВЕРКА ПЕРЕМЕННЫХ ОКРУЖЕНИЯ ==========
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     logging.error("Missing SUPABASE_URL or SUPABASE_KEY environment variables")
@@ -25,10 +24,10 @@ else:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
     logging.info("Supabase client initialized")
 
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 if not TELEGRAM_BOT_TOKEN:
     logging.warning("TELEGRAM_BOT_TOKEN не задан. Отчёты не будут отправляться.")
 
-# Часовой пояс Екатеринбурга (UTC+5)
 YEKAT_TIMEZONE = pytz.timezone('Asia/Yekaterinburg')
 
 # ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
@@ -54,7 +53,6 @@ def get_cities_by_gosb(gosb_id):
 
 def reverse_geocode(lat, lng):
     try:
-        import requests
         url = f"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={lat}&lon={lng}&accept-language=ru&zoom=18"
         r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
         if r.status_code == 200:
@@ -95,7 +93,7 @@ def fill_report_record(reg_id, reg_data, gosb_name):
         'fio': reg_data['fio'],
         'gosb_name': gosb_name,
         'tab_number': employee_data.get('tab_number'),
-        'subdivision': employee_data.get('kic_pi'),          # здесь храним КИЦ-ПИ
+        'subdivision': employee_data.get('kic_pi'),
         'fire_training': '0,5',
         'radio_comm': '0,5',
         'drills': '0,25'
@@ -112,6 +110,62 @@ def fill_report_record(reg_id, reg_data, gosb_name):
         supabase.table('report').insert(row).execute()
     except Exception as e:
         logging.error(f"fill_report_record error: {e}")
+
+def send_telegram_message(chat_id, text):
+    """Отправляет сообщение в Telegram"""
+    if not TELEGRAM_BOT_TOKEN:
+        logging.error("TELEGRAM_BOT_TOKEN не задан")
+        return False
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}
+    try:
+        r = requests.post(url, json=payload, timeout=10)
+        r.raise_for_status()
+        logging.info(f"Сообщение отправлено в {chat_id}")
+        return True
+    except Exception as e:
+        logging.error(f"Ошибка отправки в Telegram {chat_id}: {e}")
+        return False
+
+def pluralize(n, one, few, many):
+    n = abs(n) % 100
+    n1 = n % 10
+    if 10 < n < 20:
+        return many
+    if 1 < n1 < 5:
+        return few
+    if n1 == 1:
+        return one
+    return many
+
+def format_report_message_for_gosb(registrations, date_obj, gosb_name):
+    """
+    Форматирует отчёт для одного ГОСБ.
+    registrations – список записей из таблицы report (уже отфильтрованных по ГОСБ и дате)
+    """
+    if not registrations:
+        return None
+    
+    # Группируем по КИЦ (подразделение)
+    kic_groups = {}
+    for reg in registrations:
+        kic = reg.get('subdivision') or 'Без КИЦ'
+        if kic not in kic_groups:
+            kic_groups[kic] = []
+        kic_groups[kic].append(reg['fio'])
+    
+    date_str = date_obj.strftime('%d.%m.%Y')
+    lines = [f"🏢 {gosb_name} — регистрация на {date_str}\n"]
+    
+    for kic, fios in sorted(kic_groups.items()):
+        lines.append(f"🟢 КИЦ {kic}")
+        for fio in fios:
+            lines.append(f"👮 {fio}")
+        lines.append("")
+    
+    total = len(registrations)
+    lines.append(f"📨 Итого: на {date_str} • {total} {pluralize(total, 'человек', 'человека', 'человек')}")
+    return "\n".join(lines).strip()
 
 # ========== МАРШРУТЫ ==========
 @app.route('/')
@@ -232,9 +286,8 @@ def get_report_data():
             yekat_dt = utc_dt.replace(tzinfo=pytz.UTC).astimezone(YEKAT_TIMEZONE)
             formatted_date = yekat_dt.strftime('%d.%m.%Y %H:%M:%S')
             row['timestamp'] = formatted_date
-            if exact_date:
-                if yekat_dt.date().isoformat() != exact_date:
-                    continue
+            if exact_date and yekat_dt.date().isoformat() != exact_date:
+                continue
             if year and str(yekat_dt.year) != year:
                 continue
             if quarter:
@@ -265,83 +318,35 @@ def search_employees():
         logging.error(f"Ошибка поиска сотрудников: {e}")
         return jsonify([]), 500
 
-# ========== ОТПРАВКА ЕЖЕДНЕВНЫХ ОТЧЁТОВ В TELEGRAM ==========
-def send_telegram_message(chat_id, text):
-    """Отправляет сообщение в Telegram"""
-    if not TELEGRAM_BOT_TOKEN:
-        return
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {
-        'chat_id': chat_id,
-        'text': text,
-        'parse_mode': 'HTML'
-    }
-    try:
-        r = requests.post(url, json=payload, timeout=10)
-        r.raise_for_status()
-        logging.info(f"Сообщение отправлено в {chat_id}")
-    except Exception as e:
-        logging.error(f"Ошибка отправки в Telegram {chat_id}: {e}")
-
-def format_report_message(registrations, date_obj):
+# ========== ОТПРАВКА ОТЧЁТА ЗА СЕГОДНЯ В TELEGRAM (кнопка в сводной таблице) ==========
+@app.route('/api/send-today-report', methods=['POST'])
+def send_today_report():
     """
-    Форматирует отчёт по регистрациям за указанную дату.
-    registrations – список записей из таблицы report (фильтрованных по ГОСБ).
+    Отправляет отчёт за сегодня (текущую дату в Екатеринбурге) каждому ГОСБ в свой чат.
     """
-    if not registrations:
-        return None
-    
-    # Группируем по КИЦ (подразделение)
-    kic_groups = {}
-    for reg in registrations:
-        kic = reg.get('subdivision') or 'Без КИЦ'
-        if kic not in kic_groups:
-            kic_groups[kic] = []
-        kic_groups[kic].append(reg['fio'])
-    
-    date_str = date_obj.strftime('%d.%m.%Y')
-    lines = [f"🏢 Аппарат банка — регистрация на {date_str}\n"]
-    
-    for kic, fios in sorted(kic_groups.items()):
-        lines.append(f"🟢 КИЦ {kic}")
-        for fio in fios:
-            lines.append(f"👮 {fio}")
-        lines.append("")
-    
-    total = len(registrations)
-    lines.append(f"📨 Итого: на {date_str} • {total} {pluralize(total, 'человек', 'человека', 'человек')}")
-    return "\n".join(lines).strip()
-
-def pluralize(n, one, few, many):
-    n = abs(n) % 100
-    n1 = n % 10
-    if 10 < n < 20:
-        return many
-    if 1 < n1 < 5:
-        return few
-    if n1 == 1:
-        return one
-    return many
-
-@app.route('/api/send-daily-reports', methods=['GET'])
-def send_daily_reports():
-    """Эндпоинт для отправки ежедневных отчётов по ГОСБ (вызывается по Cron)"""
     if not supabase:
-        return jsonify({"error": "База данных не инициализирована"}), 500
-    
-    # Получаем все ГОСБ с chat_id
-    gosb_res = supabase.table('gosb').select('id, name, slug, chat_id').not_.is_('chat_id', 'null').execute()
-    if not gosb_res.data:
-        return jsonify({"message": "Нет получателей"}), 200
-    
-    # Дата за вчера
-    yesterday = date.today() - timedelta(days=1)
-    yesterday_str = yesterday.strftime('%Y-%m-%d')
-    
-    # Получаем все регистрации за вчера
-    report_res = supabase.table('report').select('*').gte('timestamp', yesterday_str).lte('timestamp', yesterday_str + ' 23:59:59').execute()
-    registrations = report_res.data
-    
+        return jsonify({"status": "error", "message": "База данных не инициализирована"}), 500
+    if not TELEGRAM_BOT_TOKEN:
+        return jsonify({"status": "error", "message": "Токен Telegram не настроен"}), 500
+
+    # Определяем сегодняшнюю дату в Екатеринбурге
+    now_yekat = datetime.now(YEKAT_TIMEZONE)
+    today_date = now_yekat.date()
+    today_start = datetime(today_date.year, today_date.month, today_date.day, 0, 0, 0, tzinfo=YEKAT_TIMEZONE)
+    today_end = today_start + timedelta(days=1)
+
+    # Преобразуем в UTC для запроса к БД (в таблице report timestamp в UTC)
+    start_utc = today_start.astimezone(pytz.UTC).isoformat()
+    end_utc = today_end.astimezone(pytz.UTC).isoformat()
+
+    # Получаем все регистрации за сегодня
+    query = supabase.table('report').select('*').gte('timestamp', start_utc).lt('timestamp', end_utc)
+    res = query.execute()
+    registrations = res.data
+
+    if not registrations:
+        return jsonify({"status": "ok", "message": "Нет регистраций за сегодня"}), 200
+
     # Группируем по gosb_name
     by_gosb = {}
     for reg in registrations:
@@ -349,19 +354,23 @@ def send_daily_reports():
         if gosb_name not in by_gosb:
             by_gosb[gosb_name] = []
         by_gosb[gosb_name].append(reg)
-    
-    # Для каждого ГОСБ отправляем отчёт
-    for gosb in gosb_res.data:
-        gosb_name = gosb['name']
-        chat_id = gosb['chat_id']
-        regs = by_gosb.get(gosb_name, [])
-        if not regs:
+
+    # Получаем chat_id для каждого ГОСБ
+    gosb_res = supabase.table('gosb').select('name, chat_id').execute()
+    gosb_map = {g['name']: g.get('chat_id') for g in gosb_res.data if g.get('chat_id')}
+
+    sent = 0
+    for gosb_name, regs in by_gosb.items():
+        chat_id = gosb_map.get(gosb_name)
+        if not chat_id:
+            logging.warning(f"Нет chat_id для ГОСБ {gosb_name}, пропускаем")
             continue
-        message = format_report_message(regs, yesterday)
+        message = format_report_message_for_gosb(regs, today_date, gosb_name)
         if message:
-            send_telegram_message(chat_id, message)
-    
-    return jsonify({"status": "ok", "sent": len(gosb_res.data)}), 200
+            if send_telegram_message(chat_id, message):
+                sent += 1
+
+    return jsonify({"status": "ok", "sent": sent, "total_gosb": len(by_gosb)}), 200
 
 # ========== ОТЛАДОЧНЫЙ МАРШРУТ ==========
 @app.route('/api/debug-supabase')

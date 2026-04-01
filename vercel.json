@@ -9,5 +9,11 @@
     { "src": "/api/(.*)", "dest": "/api/index.py" },
     { "src": "/qr.html", "dest": "/public/qr.html" },
     { "src": "/(.*)", "dest": "/api/index.py" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron-report",
+      "schedule": "0 9 * * *"
+    }
   ]
 }

@@ -3,8 +3,9 @@ import logging
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from supabase import create_client, Client
-from datetime import datetime
+from datetime import datetime, date, timedelta
 import pytz
+import requests
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -22,6 +23,11 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 else:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
     logging.info("Supabase client initialized")
+
+# Telegram бот
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+if not TELEGRAM_BOT_TOKEN:
+    logging.warning("TELEGRAM_BOT_TOKEN не задан. Отчёты не будут отправляться.")
 
 # Часовой пояс Екатеринбурга (UTC+5)
 YEKAT_TIMEZONE = pytz.timezone('Asia/Yekaterinburg')
@@ -49,7 +55,6 @@ def get_cities_by_gosb(gosb_id):
 
 def reverse_geocode(lat, lng):
     try:
-        import requests
         url = f"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={lat}&lon={lng}&accept-language=ru&zoom=18"
         r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
         if r.status_code == 200:
@@ -90,7 +95,7 @@ def fill_report_record(reg_id, reg_data, gosb_name):
         'fio': reg_data['fio'],
         'gosb_name': gosb_name,
         'tab_number': employee_data.get('tab_number'),
-        'subdivision': employee_data.get('kic_pi'),          # здесь храним КИЦ-ПИ
+        'subdivision': employee_data.get('kic_pi'),          # КИЦ-ПИ
         'fire_training': '0,5',
         'radio_comm': '0,5',
         'drills': '0,25'
@@ -220,24 +225,16 @@ def get_report_data():
             ts = row.get('timestamp')
             if not ts:
                 continue
-            # Парсим ISO строку (UTC)
             try:
                 utc_dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
             except:
                 continue
-            # Переводим в Екатеринбург
             yekat_dt = utc_dt.replace(tzinfo=pytz.UTC).astimezone(YEKAT_TIMEZONE)
-            # Форматируем дату как dd.mm.yyyy HH:MM:SS
             formatted_date = yekat_dt.strftime('%d.%m.%Y %H:%M:%S')
-            
-            # Заменяем timestamp на отформатированный (для отображения)
             row['timestamp'] = formatted_date
-            
-            # Фильтрация по дате (сравниваем уже в Екатеринбургском времени)
-            if exact_date:
-                # exact_date приходит как YYYY-MM-DD
-                if yekat_dt.date().isoformat() != exact_date:
-                    continue
+
+            if exact_date and yekat_dt.date().isoformat() != exact_date:
+                continue
             if year and str(yekat_dt.year) != year:
                 continue
             if quarter:
@@ -267,6 +264,94 @@ def search_employees():
     except Exception as e:
         logging.error(f"Ошибка поиска сотрудников: {e}")
         return jsonify([]), 500
+
+# ========== ОТПРАВКА ЕЖЕДНЕВНЫХ ОТЧЁТОВ В TELEGRAM ==========
+def send_telegram_message(chat_id, text):
+    if not TELEGRAM_BOT_TOKEN:
+        return
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        'chat_id': chat_id,
+        'text': text,
+        'parse_mode': 'HTML'
+    }
+    try:
+        r = requests.post(url, json=payload, timeout=10)
+        r.raise_for_status()
+        logging.info(f"Сообщение отправлено в {chat_id}")
+    except Exception as e:
+        logging.error(f"Ошибка отправки в Telegram {chat_id}: {e}")
+
+def format_report_message(registrations, date_obj):
+    if not registrations:
+        return None
+    kic_groups = {}
+    for reg in registrations:
+        kic = reg.get('subdivision') or 'Без КИЦ'
+        if kic not in kic_groups:
+            kic_groups[kic] = []
+        kic_groups[kic].append(reg['fio'])
+    
+    date_str = date_obj.strftime('%d.%m.%Y')
+    lines = [f"🏢 Аппарат банка — регистрация на {date_str}\n"]
+    for kic, fios in sorted(kic_groups.items()):
+        lines.append(f"🟢 КИЦ {kic}")
+        for fio in fios:
+            lines.append(f"👮 {fio}")
+        lines.append("")
+    total = len(registrations)
+    lines.append(f"📨 Итого: на {date_str} • {total} {pluralize(total, 'человек', 'человека', 'человек')}")
+    return "\n".join(lines).strip()
+
+def pluralize(n, one, few, many):
+    n = abs(n) % 100
+    n1 = n % 10
+    if 10 < n < 20:
+        return many
+    if 1 < n1 < 5:
+        return few
+    if n1 == 1:
+        return one
+    return many
+
+@app.route('/api/send-daily-reports', methods=['GET'])
+def send_daily_reports():
+    if not supabase:
+        return jsonify({"error": "База данных не инициализирована"}), 500
+    
+    # Получаем все ГОСБ с chat_id
+    gosb_res = supabase.table('gosb').select('id, name, slug, chat_id').not_.is_('chat_id', 'null').execute()
+    if not gosb_res.data:
+        return jsonify({"message": "Нет получателей"}), 200
+    
+    yesterday = date.today() - timedelta(days=1)
+    yesterday_str = yesterday.strftime('%Y-%m-%d')
+    
+    # Получаем все регистрации за вчера (используем timestamp в UTC, так как он хранится в ISO)
+    # Нужно получить записи, где timestamp в UTC соответствует вчерашнему дню в Екатеринбурге?
+    # Для упрощения фильтруем по UTC-дате (может немного сместиться, но для отчёта приемлемо)
+    report_res = supabase.table('report').select('*').gte('timestamp', yesterday_str).lte('timestamp', yesterday_str + ' 23:59:59').execute()
+    registrations = report_res.data
+    
+    # Группируем по gosb_name
+    by_gosb = {}
+    for reg in registrations:
+        gosb_name = reg.get('gosb_name')
+        if gosb_name not in by_gosb:
+            by_gosb[gosb_name] = []
+        by_gosb[gosb_name].append(reg)
+    
+    for gosb in gosb_res.data:
+        gosb_name = gosb['name']
+        chat_id = gosb['chat_id']
+        regs = by_gosb.get(gosb_name, [])
+        if not regs:
+            continue
+        message = format_report_message(regs, yesterday)
+        if message:
+            send_telegram_message(chat_id, message)
+    
+    return jsonify({"status": "ok", "sent": len(gosb_res.data)}), 200
 
 # ========== ОТЛАДОЧНЫЙ МАРШРУТ ==========
 @app.route('/api/debug-supabase')

@@ -314,7 +314,7 @@ def pluralize(n, one, few, many):
         return one
     return many
 
-@app.route('/api/send-daily-reports', methods=['GET'])
+@app.route('/api/cron-report', methods=['GET'])
 def send_daily_reports():
     if not supabase:
         return jsonify({"error": "База данных не инициализирована"}), 500

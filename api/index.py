@@ -4,6 +4,7 @@ from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from supabase import create_client, Client
 from datetime import datetime
+import pytz
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -21,6 +22,9 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 else:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
     logging.info("Supabase client initialized")
+
+# Часовой пояс Екатеринбурга (UTC+5)
+YEKAT_TIMEZONE = pytz.timezone('Asia/Yekaterinburg')
 
 # ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 def get_gosb_by_slug(slug):
@@ -70,11 +74,11 @@ def fill_report_record(reg_id, reg_data, gosb_name):
         return
     purpose = reg_data['purpose']
     
-    # Получаем данные сотрудника, если есть employee_id
+    # Получаем данные сотрудника (табельный номер, КИЦ-ПИ)
     employee_data = {}
     if reg_data.get('employee_id'):
         try:
-            emp_res = supabase.table('employees').select('tab_number, position, gosb_name').eq('id', reg_data['employee_id']).execute()
+            emp_res = supabase.table('employees').select('tab_number, kic_pi').eq('id', reg_data['employee_id']).execute()
             if emp_res.data:
                 employee_data = emp_res.data[0]
         except Exception as e:
@@ -86,7 +90,7 @@ def fill_report_record(reg_id, reg_data, gosb_name):
         'fio': reg_data['fio'],
         'gosb_name': gosb_name,
         'tab_number': employee_data.get('tab_number'),
-        'subdivision': employee_data.get('position'),  # используем должность как подразделение
+        'subdivision': employee_data.get('kic_pi'),          # здесь храним КИЦ-ПИ
         'fire_training': '0,5',
         'radio_comm': '0,5',
         'drills': '0,25'
@@ -211,25 +215,36 @@ def get_report_data():
             query = query.ilike('fio', f'%{fio}%')
         res = query.execute()
         data = res.data
-        # Фильтрация по дате на стороне Python
         filtered = []
         for row in data:
             ts = row.get('timestamp')
             if not ts:
                 continue
+            # Парсим ISO строку (UTC)
             try:
-                d = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                utc_dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
             except:
                 continue
-            if exact_date and d.date().isoformat() != exact_date:
-                continue
-            if year and str(d.year) != year:
+            # Переводим в Екатеринбург
+            yekat_dt = utc_dt.replace(tzinfo=pytz.UTC).astimezone(YEKAT_TIMEZONE)
+            # Форматируем дату как dd.mm.yyyy HH:MM:SS
+            formatted_date = yekat_dt.strftime('%d.%m.%Y %H:%M:%S')
+            
+            # Заменяем timestamp на отформатированный (для отображения)
+            row['timestamp'] = formatted_date
+            
+            # Фильтрация по дате (сравниваем уже в Екатеринбургском времени)
+            if exact_date:
+                # exact_date приходит как YYYY-MM-DD
+                if yekat_dt.date().isoformat() != exact_date:
+                    continue
+            if year and str(yekat_dt.year) != year:
                 continue
             if quarter:
-                q = (d.month - 1) // 3 + 1
+                q = (yekat_dt.month - 1) // 3 + 1
                 if str(q) != quarter:
                     continue
-            if month and str(d.month) != month:
+            if month and str(yekat_dt.month) != month:
                 continue
             filtered.append(row)
         return jsonify(filtered)
@@ -245,9 +260,9 @@ def search_employees():
         return jsonify([])
     try:
         if query.isdigit():
-            res = supabase.table('employees').select('id, fio, tab_number, position').eq('tab_number', query).limit(limit).execute()
+            res = supabase.table('employees').select('id, fio, tab_number, kic_pi').eq('tab_number', query).limit(limit).execute()
         else:
-            res = supabase.table('employees').select('id, fio, tab_number, position').ilike('fio', f'%{query}%').limit(limit).execute()
+            res = supabase.table('employees').select('id, fio, tab_number, kic_pi').ilike('fio', f'%{query}%').limit(limit).execute()
         return jsonify(res.data)
     except Exception as e:
         logging.error(f"Ошибка поиска сотрудников: {e}")

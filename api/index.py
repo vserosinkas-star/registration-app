@@ -353,11 +353,12 @@ def get_statistics():
     month = request.args.get('month')
     exact_date = request.args.get('exact_date')
 
-    # Общее число сотрудников в подразделении
+    # ---------- 1. Общее число сотрудников в выбранном подразделении ----------
     emp_query = supabase.table('employees').select('fio, tab_number, kic_pi, gosb_name')
     if gosb_name:
         emp_query = emp_query.eq('gosb_name', gosb_name)
     if city:
+        # Ищем по kic_pi (частичное совпадение, как и в report.subdivision)
         emp_query = emp_query.ilike('kic_pi', f'%{city}%')
     emp_res = emp_query.execute()
     employee_ids = set()
@@ -368,15 +369,17 @@ def get_statistics():
             employee_ids.add(e['fio'].strip().lower())
     total_employees = len(employee_ids)
 
-    # Уникальные регистрации за период
+    # ---------- 2. Уникальные регистрации за период ----------
     report_query = supabase.table('report').select('fio, tab_number, subdivision, timestamp')
     if gosb_name:
         report_query = report_query.eq('gosb_name', gosb_name)
     if city:
         report_query = report_query.ilike('subdivision', f'%{city}%')
+
     report_res = report_query.execute()
 
-    registered_ids = set()
+    # Фильтрация по дате
+    filtered_regs = []
     for row in report_res.data:
         ts = row.get('timestamp')
         if not ts:
@@ -397,14 +400,19 @@ def get_statistics():
                 continue
         if month and str(yekat_dt.month) != month:
             continue
+        filtered_regs.append(row)
 
-        if row.get('tab_number'):
-            registered_ids.add(row['tab_number'])
-        elif row.get('fio'):
-            registered_ids.add(row['fio'].strip().lower())
-
+    registered_ids = set()
+    for reg in filtered_regs:
+        if reg.get('tab_number'):
+            registered_ids.add(reg['tab_number'])
+        elif reg.get('fio'):
+            registered_ids.add(reg['fio'].strip().lower())
     registered_count = len(registered_ids)
+
     percentage = (registered_count / total_employees * 100) if total_employees > 0 else 0
+
+    logging.info(f"Statistics: gosb={gosb_name}, city={city}, total_employees={total_employees}, registered={registered_count}")
 
     return jsonify({
         "total_employees": total_employees,

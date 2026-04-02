@@ -54,69 +54,59 @@ def get_cities_by_gosb(gosb_id):
 
 def reverse_geocode(lat, lng):
     try:
-        # Преобразуем в float (если пришли строки)
         lat = float(lat)
         lng = float(lng)
         lat_fixed = round(lat, 5)
         lng_fixed = round(lng, 5)
-        
+
         url = f"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={lat_fixed}&lon={lng_fixed}&accept-language=ru&zoom=18&addressdetails=1"
         headers = {'User-Agent': 'Mozilla/5.0 (compatible; RegistrationApp/1.0)'}
-        
         response = requests.get(url, headers=headers, timeout=15)
+
         if response.status_code == 200:
             data = response.json()
             if data and data.get('address'):
                 addr = data['address']
                 parts = []
-                
-                # Улица и номер дома
+
                 road = addr.get('road')
                 house = addr.get('house_number')
                 if road:
                     parts.append(road)
                 if house:
                     parts.append('д. ' + house)
-                
-                # Город / населённый пункт
+
                 city = addr.get('city') or addr.get('town') or addr.get('village') or addr.get('hamlet')
                 if city:
                     if parts:
                         parts.insert(0, city + ',')
                     else:
                         parts.append(city)
-                
-                # Если адрес получился короткий, используем display_name
+
                 if len(parts) < 2 and data.get('display_name'):
                     display = data['display_name']
-                    # Отсекаем страну и почтовый индекс
                     display = display.split(', Россия')[0]
                     display_parts = display.split(', ')
                     if len(display_parts) >= 2:
                         parts = [display_parts[0] + ',', display_parts[1]]
                     else:
                         parts = [display]
-                
+
                 full = ' '.join(parts).strip()
                 if full:
-                    # Заменяем запятые на • для читаемости
                     full = full.replace(',', ' •')
                     return full
-        
-        # Если не удалось получить адрес, возвращаем координаты
+
         return f"шир. {lat_fixed} • долг. {lng_fixed}"
-    
     except Exception as e:
         logging.error(f"reverse_geocode error: {e}")
-        # В случае ошибки возвращаем координаты
         return f"шир. {round(float(lat),5)} • долг. {round(float(lng),5)}"
 
 def fill_report_record(reg_id, reg_data, gosb_name):
     if not supabase:
         return
     purpose = reg_data['purpose']
-    
-    # Получаем данные сотрудника (табельный номер, КИЦ-ПИ)
+
     employee_data = {}
     if reg_data.get('employee_id'):
         try:
@@ -125,7 +115,7 @@ def fill_report_record(reg_id, reg_data, gosb_name):
                 employee_data = emp_res.data[0]
         except Exception as e:
             logging.error(f"Ошибка получения сотрудника: {e}")
-    
+
     row = {
         'registration_id': reg_id,
         'timestamp': reg_data['timestamp'],
@@ -151,16 +141,11 @@ def fill_report_record(reg_id, reg_data, gosb_name):
         logging.error(f"fill_report_record error: {e}")
 
 def send_telegram_message(chat_id, text):
-    """Отправляет сообщение в Telegram"""
     if not TELEGRAM_BOT_TOKEN:
         logging.error("TELEGRAM_BOT_TOKEN не задан")
         return
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {
-        'chat_id': chat_id,
-        'text': text,
-        'parse_mode': 'HTML'
-    }
+    payload = {'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}
     try:
         r = requests.post(url, json=payload, timeout=10)
         r.raise_for_status()
@@ -169,25 +154,20 @@ def send_telegram_message(chat_id, text):
         logging.error(f"Ошибка отправки в Telegram {chat_id}: {e}")
 
 def format_report_message(registrations):
-    """Форматирует список регистраций в текст для Telegram"""
     if not registrations:
         return None
-    
-    # Группируем по КИЦ (подразделение)
     kic_groups = {}
     for reg in registrations:
         kic = reg.get('subdivision') or 'Без КИЦ'
         if kic not in kic_groups:
             kic_groups[kic] = []
         kic_groups[kic].append(reg['fio'])
-    
     lines = []
     for kic, fios in sorted(kic_groups.items()):
         lines.append(f"🟢 КИЦ {kic}")
         for fio in fios:
             lines.append(f"👮 {fio}")
         lines.append("")
-    
     total = len(registrations)
     lines.append(f"📨 Итого: {total} {pluralize(total, 'человек', 'человека', 'человек')}")
     return "\n".join(lines).strip()
@@ -204,13 +184,8 @@ def pluralize(n, one, few, many):
     return many
 
 def send_telegram_to_gosb(gosb, message):
-    """
-    Отправляет сообщение основному получателю ГОСБ и в копию (если указана).
-    """
-    # Основной получатель
     if gosb.get('chat_id'):
         send_telegram_message(gosb['chat_id'], message)
-    # Копия
     if gosb.get('copy_chat_id'):
         send_telegram_message(gosb['copy_chat_id'], message)
 
@@ -366,84 +341,144 @@ def search_employees():
         logging.error(f"Ошибка поиска сотрудников: {e}")
         return jsonify([]), 500
 
-# ========== ЕЖЕДНЕВНЫЙ ОТЧЁТ ПО РАСПИСАНИЮ (CRON) ==========
+@app.route('/api/statistics')
+def get_statistics():
+    if not supabase:
+        return jsonify({"error": "База данных не инициализирована"}), 500
+
+    gosb_name = request.args.get('gosb')
+    city = request.args.get('city')
+    year = request.args.get('year')
+    quarter = request.args.get('quarter')
+    month = request.args.get('month')
+    exact_date = request.args.get('exact_date')
+
+    # Общее число сотрудников в подразделении
+    emp_query = supabase.table('employees').select('fio, tab_number, kic_pi, gosb_name')
+    if gosb_name:
+        emp_query = emp_query.eq('gosb_name', gosb_name)
+    if city:
+        emp_query = emp_query.ilike('kic_pi', f'%{city}%')
+    emp_res = emp_query.execute()
+    employee_ids = set()
+    for e in emp_res.data:
+        if e.get('tab_number'):
+            employee_ids.add(e['tab_number'])
+        elif e.get('fio'):
+            employee_ids.add(e['fio'].strip().lower())
+    total_employees = len(employee_ids)
+
+    # Уникальные регистрации за период
+    report_query = supabase.table('report').select('fio, tab_number, subdivision, timestamp')
+    if gosb_name:
+        report_query = report_query.eq('gosb_name', gosb_name)
+    if city:
+        report_query = report_query.ilike('subdivision', f'%{city}%')
+    report_res = report_query.execute()
+
+    registered_ids = set()
+    for row in report_res.data:
+        ts = row.get('timestamp')
+        if not ts:
+            continue
+        try:
+            utc_dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+        except:
+            continue
+        yekat_dt = utc_dt.replace(tzinfo=pytz.UTC).astimezone(YEKAT_TIMEZONE)
+
+        if exact_date and yekat_dt.date().isoformat() != exact_date:
+            continue
+        if year and str(yekat_dt.year) != year:
+            continue
+        if quarter:
+            q = (yekat_dt.month - 1) // 3 + 1
+            if str(q) != quarter:
+                continue
+        if month and str(yekat_dt.month) != month:
+            continue
+
+        if row.get('tab_number'):
+            registered_ids.add(row['tab_number'])
+        elif row.get('fio'):
+            registered_ids.add(row['fio'].strip().lower())
+
+    registered_count = len(registered_ids)
+    percentage = (registered_count / total_employees * 100) if total_employees > 0 else 0
+
+    return jsonify({
+        "total_employees": total_employees,
+        "registered_unique": registered_count,
+        "percentage": round(percentage, 1)
+    })
+
+# ========== ОТПРАВКА В TELEGRAM ==========
 @app.route('/api/send-daily-reports', methods=['GET'])
 def send_daily_reports():
-    """Отправляет отчёты за вчерашний день каждому ГОСБ в свой чат и копию"""
     if not supabase:
         return jsonify({"error": "База данных не инициализирована"}), 500
-    
-    # Получаем все ГОСБ с chat_id (copy_chat_id может быть NULL)
+
     gosb_res = supabase.table('gosb').select('id, name, slug, chat_id, copy_chat_id').not_.is_('chat_id', 'null').execute()
     if not gosb_res.data:
         return jsonify({"message": "Нет получателей"}), 200
-    
+
     yesterday = date.today() - timedelta(days=1)
     yesterday_str = yesterday.strftime('%Y-%m-%d')
-    
-    # Получаем все регистрации за вчера (timestamp хранится в UTC)
-    # Используем фильтр по дате (строка ISO)
     report_res = supabase.table('report').select('*').gte('timestamp', yesterday_str).lte('timestamp', yesterday_str + ' 23:59:59').execute()
     registrations = report_res.data
-    
-    # Группируем по gosb_name
+
     by_gosb = {}
     for reg in registrations:
         gosb_name = reg.get('gosb_name')
         if gosb_name not in by_gosb:
             by_gosb[gosb_name] = []
         by_gosb[gosb_name].append(reg)
-    
+
     sent_count = 0
     for gosb in gosb_res.data:
-        gosb_name = gosb['name']
-        regs = by_gosb.get(gosb_name, [])
+        regs = by_gosb.get(gosb['name'], [])
         if not regs:
             continue
         message = format_report_message(regs)
         if message:
-            full_message = f"🏢 {gosb_name} — регистрация на {yesterday.strftime('%d.%m.%Y')}\n\n{message}"
+            full_message = f"🏢 {gosb['name']} — регистрация на {yesterday.strftime('%d.%m.%Y')}\n\n{message}"
             send_telegram_to_gosb(gosb, full_message)
             sent_count += 1
-    
+
     return jsonify({"status": "ok", "sent": sent_count}), 200
 
-# ========== ОТПРАВКА ОТЧЁТА ЗА СЕГОДНЯ (КНОПКА) ==========
 @app.route('/api/send-today-reports', methods=['POST'])
 def send_today_reports():
-    """Отправляет отчёты за сегодня каждому ГОСБ в свой чат и копию (по нажатию кнопки)"""
     if not supabase:
         return jsonify({"error": "База данных не инициализирована"}), 500
-    
+
     gosb_res = supabase.table('gosb').select('id, name, slug, chat_id, copy_chat_id').not_.is_('chat_id', 'null').execute()
     if not gosb_res.data:
         return jsonify({"message": "Нет получателей"}), 200
-    
+
     today = date.today()
     today_str = today.strftime('%Y-%m-%d')
-    
     report_res = supabase.table('report').select('*').gte('timestamp', today_str).lte('timestamp', today_str + ' 23:59:59').execute()
     registrations = report_res.data
-    
+
     by_gosb = {}
     for reg in registrations:
         gosb_name = reg.get('gosb_name')
         if gosb_name not in by_gosb:
             by_gosb[gosb_name] = []
         by_gosb[gosb_name].append(reg)
-    
+
     sent_count = 0
     for gosb in gosb_res.data:
-        gosb_name = gosb['name']
-        regs = by_gosb.get(gosb_name, [])
+        regs = by_gosb.get(gosb['name'], [])
         if not regs:
             continue
         message = format_report_message(regs)
         if message:
-            full_message = f"🏢 {gosb_name} — регистрация на {today.strftime('%d.%m.%Y')}\n\n{message}"
+            full_message = f"🏢 {gosb['name']} — регистрация на {today.strftime('%d.%m.%Y')}\n\n{message}"
             send_telegram_to_gosb(gosb, full_message)
             sent_count += 1
-    
+
     return jsonify({"status": "ok", "sent": sent_count}), 200
 
 # ========== ОТЛАДОЧНЫЙ МАРШРУТ ==========

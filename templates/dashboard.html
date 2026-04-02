@@ -334,7 +334,7 @@ async function loadStatistics() {
         const statCard = document.getElementById('statisticsCard');
         const statText = document.getElementById('statText');
         if (stats.total_employees > 0) {
-            statText.innerHTML = `Зарегистрировано <strong>${stats.registered_unique}</strong> из <strong>${stats.total_employees}</strong> сотрудников (<strong>${stats.percentage}%</strong>)`;
+            statText.innerHTML = `Обучено <strong>${stats.registered_unique}</strong> из <strong>${stats.total_employees}</strong> сотрудников (<strong>${stats.percentage}%</strong>)`;
             statCard.style.display = 'block';
         } else {
             // Если нет сотрудников в БД, показываем сообщение

@@ -304,42 +304,45 @@
     }
 
     async function loadStatistics() {
-        const gosb = document.getElementById('gosbSelect').value;
-        const city = document.getElementById('kicSelect').value;
-        const year = document.getElementById('yearFilter').value;
-        const quarter = document.getElementById('quarterFilter').value;
-        const month = document.getElementById('monthFilter').value;
-        const exactDate = formatDateForApi(document.getElementById('datePicker').value);
+    const gosb = document.getElementById('gosbSelect').value;
+    const city = document.getElementById('kicSelect').value;
+    const year = document.getElementById('yearFilter').value;
+    const quarter = document.getElementById('quarterFilter').value;
+    const month = document.getElementById('monthFilter').value;
+    const exactDate = formatDateForApi(document.getElementById('datePicker').value);
 
-        if (!gosb && !city) {
-            document.getElementById('statisticsCard').style.display = 'none';
-            return;
-        }
-
-        let url = '/api/statistics?';
-        const params = new URLSearchParams();
-        if (gosb) params.append('gosb', gosb);
-        if (city) params.append('city', city);
-        if (year) params.append('year', year);
-        if (quarter) params.append('quarter', quarter);
-        if (month) params.append('month', month);
-        if (exactDate) params.append('exact_date', exactDate);
-        url += params.toString();
-
-        try {
-            const resp = await fetch(url);
-            const stats = await resp.json();
-            const statCard = document.getElementById('statisticsCard');
-            if (stats.total_employees > 0) {
-                document.getElementById('statText').innerHTML = `Зарегистрировано <strong>${stats.registered_unique}</strong> из <strong>${stats.total_employees}</strong> сотрудников (<strong>${stats.percentage}%</strong>)`;
-                statCard.style.display = 'block';
-            } else {
-                statCard.style.display = 'none';
-            }
-        } catch (err) {
-            console.error('Ошибка загрузки статистики:', err);
-        }
+    if (!gosb && !city) {
+        document.getElementById('statisticsCard').style.display = 'none';
+        return;
     }
+
+    let url = '/api/statistics?';
+    const params = new URLSearchParams();
+    if (gosb) params.append('gosb', gosb);
+    if (city) params.append('city', city);
+    if (year) params.append('year', year);
+    if (quarter) params.append('quarter', quarter);
+    if (month) params.append('month', month);
+    if (exactDate) params.append('exact_date', exactDate);
+    url += params.toString();
+
+    console.log("Statistics URL:", url);  // ОТЛАДКА
+
+    try {
+        const resp = await fetch(url);
+        const stats = await resp.json();
+        console.log("Statistics response:", stats);  // ОТЛАДКА
+        const statCard = document.getElementById('statisticsCard');
+        if (stats.total_employees > 0) {
+            document.getElementById('statText').innerHTML = `Зарегистрировано <strong>${stats.registered_unique}</strong> из <strong>${stats.total_employees}</strong> сотрудников (<strong>${stats.percentage}%</strong>)`;
+            statCard.style.display = 'block';
+        } else {
+            statCard.style.display = 'none';
+        }
+    } catch (err) {
+        console.error('Ошибка загрузки статистики:', err);
+    }
+}
 
     async function loadTableData() {
         const gosb = document.getElementById('gosbSelect').value;

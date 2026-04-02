@@ -49,11 +49,10 @@
         }
         .filters-card {
             background: rgba(20, 20, 40, 0.7);
-            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 24px; padding: 1.5rem; margin-bottom: 2rem;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-            transition: all 0.3s ease;
         }
         .filters-grid {
             display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;
@@ -70,7 +69,7 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 14px; font-family: 'Inter', sans-serif;
             font-size: 0.95rem; color: #f0f0f0;
-            transition: all 0.2s; outline: none; backdrop-filter: blur(5px);
+            transition: all 0.2s; outline: none;
         }
         .filter-item select option { background: #1a1a2e; color: #fff; }
         .filter-item input.flatpickr-input { 
@@ -80,7 +79,6 @@
         .filter-item input:focus, .filter-item select:focus {
             border-color: #6c5ce7; box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.3);
         }
-        .filter-item input::placeholder { color: #6a6a8b; font-weight: 300; }
         .filter-buttons { display: flex; gap: 1rem; align-items: center; margin-left: auto; }
         .btn {
             padding: 0.7rem 2rem; border: none; border-radius: 14px;
@@ -88,7 +86,6 @@
             cursor: pointer; transition: all 0.2s;
             background: linear-gradient(135deg, #6c5ce7, #a463f5);
             color: white; box-shadow: 0 10px 20px -5px rgba(108, 92, 231, 0.4);
-            letter-spacing: 0.02em;
         }
         .btn-outline {
             background: transparent; border: 1px solid rgba(255, 255, 255, 0.2);
@@ -98,7 +95,7 @@
         .btn:hover { transform: translateY(-2px); box-shadow: 0 15px 25px -5px #6c5ce7; }
         .table-card {
             background: rgba(20, 20, 40, 0.6);
-            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 24px; padding: 1.5rem;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4); overflow-x: auto;
@@ -121,17 +118,12 @@
             padding: 1rem 0.8rem; border: none; color: #e0e0f0;
             font-size: 0.95rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
-        #dataTable tfoot { display: table-header-group; }
-        #dataTable tfoot th { background: transparent; padding: 0.8rem 0.5rem; border: none; }
         #dataTable tfoot input {
             width: 100%; padding: 0.5rem 0.8rem;
             background: rgba(10, 10, 20, 0.5);
             border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px;
             font-family: 'Inter', sans-serif; font-size: 0.85rem;
-            color: #f0f0f0; transition: all 0.2s; outline: none;
-        }
-        #dataTable tfoot input:focus {
-            border-color: #6c5ce7; box-shadow: 0 0 0 2px rgba(108, 92, 231, 0.3);
+            color: #f0f0f0;
         }
         .dataTables_wrapper .dataTables_paginate .paginate_button {
             background: rgba(40, 40, 60, 0.6); border: 1px solid rgba(255, 255, 255, 0.1);
@@ -145,9 +137,6 @@
             background: rgba(20, 20, 40, 0.6); border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px; color: #e0e0e0; padding: 0.4rem 1rem;
         }
-        .dataTables_info, .dataTables_length { color: #a0a0c0 !important; }
-        
-        /* Счетчик записей */
         .records-counter {
             display: inline-block;
             margin-left: 1rem;
@@ -159,191 +148,123 @@
             color: #a8ede0;
             font-weight: 600;
         }
-        .records-counter .total-count {
-            color: #fed6e3;
-            font-weight: 700;
-        }
-
-        /* ========== СТИЛИ ДЛЯ FLATPICKR (тёмная тема) ========== */
+        /* flatpickr тёмная тема */
         .flatpickr-calendar {
             background: rgba(20, 20, 40, 0.95) !important;
             border: 1px solid rgba(108, 92, 231, 0.3) !important;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5) !important;
             border-radius: 16px !important;
         }
         .flatpickr-day { color: #e0e0e0 !important; }
-        .flatpickr-day:hover {
-            background: rgba(108, 92, 231, 0.3) !important;
-            border-color: rgba(108, 92, 231, 0.3) !important;
-        }
-        .flatpickr-day.selected {
-            background: #6c5ce7 !important;
-            border-color: #6c5ce7 !important;
-        }
-        .flatpickr-day.today {
-            border-color: #a8ede0 !important;
-            color: #a8ede0 !important;
-        }
-        .flatpickr-months .flatpickr-month {
-            background: rgba(20, 20, 40, 0.95) !important;
-            color: #e0e0e0 !important;
-        }
-        .flatpickr-months .flatpickr-prev-month,
-        .flatpickr-months .flatpickr-next-month {
-            color: #e0e0e0 !important;
-        }
-        .flatpickr-months .flatpickr-prev-month:hover,
-        .flatpickr-months .flatpickr-next-month:hover {
-            color: #6c5ce7 !important;
-        }
-        .flatpickr-weekdays { background: rgba(20, 20, 40, 0.95) !important; }
-        .flatpickr-weekday { color: #a0a0c0 !important; }
-        .flatpickr-time {
-            background: rgba(20, 20, 40, 0.95) !important;
-            border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
-        }
-        .flatpickr-time input {
-            background: rgba(10, 10, 20, 0.5) !important;
-            color: #e0e0e0 !important;
-        }
-        .flatpickr-time .numInputWrapper span.arrowUp:after { border-bottom-color: #6c5ce7 !important; }
-        .flatpickr-time .numInputWrapper span.arrowDown:after { border-top-color: #6c5ce7 !important; }
-
-        /* ========== КОМПАКТНАЯ СЕТКА ДЛЯ МОБИЛЬНЫХ ========== */
+        .flatpickr-day.selected { background: #6c5ce7 !important; border-color: #6c5ce7 !important; }
         @media (max-width: 768px) {
-            body { padding: 0.1rem; line-height: 1; }
-            h1 { font-size: 1rem; margin: 0.1rem 0; }
-            .filters-card { padding: 0.1rem; margin-bottom: 0.1rem; border-radius: 8px; }
-            .filters-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.1rem; align-items: stretch; }
-            .filter-item { min-width: auto; margin: 0; }
-            .filter-item:nth-child(1) { grid-column: 1; }
-            .filter-item:nth-child(2) { grid-column: 2; }
-            .filter-item:nth-child(3), .filter-item:nth-child(4), .filter-item:nth-child(5), 
-            .filter-item:nth-child(6), .filter-item:nth-child(7) { grid-column: 1 / -1; }
-            .filter-buttons { grid-column: 1 / -1; display: flex; gap: 0.1rem; margin-top: 0.1rem; width: 100%; }
-            .filter-item label { font-size: 0.45rem; margin: 0; padding: 0; line-height: 1; font-weight: 600; text-transform: uppercase; color: #a0a0c0; }
-            .filter-item select, .filter-item input { padding: 0.1rem 0.2rem; font-size: 0.6rem; border-radius: 4px; margin: 0; border-width: 1px; height: 1.5rem; }
-            .filter-item input.flatpickr-input { background-size: 12px; background-position: right 5px center; }
-            .btn { padding: 0.1rem 0.2rem; font-size: 0.55rem; flex: 1 1 auto; text-align: center; border-radius: 4px; margin: 0; box-shadow: none; border: 1px solid rgba(255,255,255,0.2); }
-            .table-card { padding: 0.1rem; }
-            #dataTable { font-size: 0.45rem; }
-            #dataTable thead th { padding: 0.1rem 0.05rem; font-size: 0.4rem; white-space: nowrap; }
-            #dataTable tbody td { padding: 0.1rem 0.05rem; font-size: 0.45rem; white-space: nowrap; }
-            #dataTable tfoot input { padding: 0.05rem 0.1rem; font-size: 0.4rem; }
-            .dataTables_wrapper .dataTables_paginate .paginate_button { padding: 0.05rem 0.1rem; font-size: 0.45rem; }
-            .dataTables_info, .dataTables_length { font-size: 0.4rem; }
-            .records-counter {
-                display: block;
-                margin: 0.1rem 0;
-                font-size: 0.4rem;
-                padding: 0.05rem 0.2rem;
-            }
+            body { padding: 0.5rem; }
+            h1 { font-size: 1.2rem; }
+            .filters-card { padding: 0.75rem; }
+            .filters-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+            .filter-item { min-width: auto; }
+            .filter-buttons { grid-column: 1 / -1; display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+            .btn { padding: 0.3rem 0.8rem; font-size: 0.7rem; }
+            #dataTable { font-size: 0.7rem; }
+            #dataTable th, #dataTable td { padding: 0.3rem; }
         }
-        @media (max-width: 480px) { #dataTable tfoot { display: none; } }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🧠 Сводная панель обучения (AI Edition)</h1>
+<div class="container">
+    <h1>🧠 Сводная панель обучения (AI Edition)</h1>
 
-        <!-- Панель фильтров -->
-        <div class="filters-card">
-            <div class="filters-grid">
-                <div class="filter-item">
-                    <label for="gosbSelect">ГОСБ</label>
-                    <select id="gosbSelect"><option value="">Все ГОСБ</option></select>
-                </div>
-                <div class="filter-item">
-                    <label for="kicSelect">КИЦ</label>
-                    <select id="kicSelect" disabled><option value="">Все КИЦ</option></select>
-                </div>
-                <div class="filter-item">
-                    <label for="fioFilter">Ф.И.О.</label>
-                    <input type="text" id="fioFilter" placeholder="Введите имя...">
-                </div>
-                <!-- Единый фильтр по дате с всплывающим календарём -->
-                <div class="filter-item">
-                    <label for="datePicker">📅 Дата</label>
-                    <input type="text" id="datePicker" class="flatpickr-input" placeholder="Выберите дату">
-                </div>
-                <!-- Дополнительные фильтры по дате -->
-                <div class="filter-item">
-                    <label for="yearFilter">Год</label>
-                    <select id="yearFilter"><option value="">Все годы</option></select>
-                </div>
-                <div class="filter-item">
-                    <label for="quarterFilter">Квартал</label>
-                    <select id="quarterFilter">
-                        <option value="">Все кварталы</option>
-                        <option value="1">1 Квартал</option>
-                        <option value="2">2 Квартал</option>
-                        <option value="3">3 Квартал</option>
-                        <option value="4">4 Квартал</option>
-                    </select>
-                </div>
-                <div class="filter-item">
-                    <label for="monthFilter">Месяц</label>
-                    <select id="monthFilter">
-                        <option value="">Все месяцы</option>
-                        <option value="1">Январь</option><option value="2">Февраль</option><option value="3">Март</option>
-                        <option value="4">Апрель</option><option value="5">Май</option><option value="6">Июнь</option>
-                        <option value="7">Июль</option><option value="8">Август</option><option value="9">Сентябрь</option>
-                        <option value="10">Октябрь</option><option value="11">Ноябрь</option><option value="12">Декабрь</option>
-                    </select>
-                </div>
-                <div class="filter-buttons">
-                    <button class="btn" id="applyFilters">🔍 Применить</button>
-                    <button class="btn btn-outline" id="resetFilters">↺ Сбросить</button>
-                    <button class="btn btn-outline" id="sendTodayReportBtn">📨 Отправить отчёт за сегодня</button>
-                </div>
+    <div class="filters-card">
+        <div class="filters-grid">
+            <div class="filter-item">
+                <label for="gosbSelect">ГОСБ</label>
+                <select id="gosbSelect"><option value="">Все ГОСБ</option></select>
             </div>
-        </div>
-
-        <!-- Карточка таблицы -->
-        <div class="table-card">
-            <table id="dataTable" class="display" style="width:100%">
-                <thead>
-                    <tr>
-                        <th>Дата и время</th><th>Табельный №</th><th>Ф.И.О.</th><th>Подразделение</th>
-                        <th>Огневая ОЭТ, VR-тренажер/ (УТС автомат)</th><th>Блочное обучение</th>
-                        <th>Радиосвязь и мониторинг</th><th>Учения по мониторингу и взаимодействию с СЦ ЦМИ</th>
-                        <th>Контраварийная подготовка</th><th>Модуль 1</th><th>ЕПП</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-                <tfoot>
-                    <tr>
-                        <th><input type="text" placeholder="Дата/время" /></th><th><input type="text" placeholder="Таб.№" /></th>
-                        <th><input type="text" placeholder="Ф.И.О." /></th><th><input type="text" placeholder="Подразделение" /></th>
-                        <th><input type="text" placeholder="ОЭТ/VR" /></th><th><input type="text" placeholder="Блочное" /></th>
-                        <th><input type="text" placeholder="Радиосвязь" /></th><th><input type="text" placeholder="Учения" /></th>
-                        <th><input type="text" placeholder="Контравар." /></th><th><input type="text" placeholder="Модуль 1" /></th>
-                        <th><input type="text" placeholder="ЕПП" /></th>
-                    </tr>
-                </tfoot>
-            </table>
+            <div class="filter-item">
+                <label for="kicSelect">КИЦ</label>
+                <select id="kicSelect" disabled><option value="">Все КИЦ</option></select>
+            </div>
+            <div class="filter-item">
+                <label for="fioFilter">Ф.И.О.</label>
+                <input type="text" id="fioFilter" placeholder="Введите имя...">
+            </div>
+            <div class="filter-item">
+                <label for="datePicker">📅 Дата</label>
+                <input type="text" id="datePicker" class="flatpickr-input" placeholder="Выберите дату">
+            </div>
+            <div class="filter-item">
+                <label for="yearFilter">Год</label>
+                <select id="yearFilter"><option value="">Все годы</option></select>
+            </div>
+            <div class="filter-item">
+                <label for="quarterFilter">Квартал</label>
+                <select id="quarterFilter">
+                    <option value="">Все кварталы</option>
+                    <option value="1">1 Квартал</option>
+                    <option value="2">2 Квартал</option>
+                    <option value="3">3 Квартал</option>
+                    <option value="4">4 Квартал</option>
+                </select>
+            </div>
+            <div class="filter-item">
+                <label for="monthFilter">Месяц</label>
+                <select id="monthFilter">
+                    <option value="">Все месяцы</option>
+                    <option value="1">Январь</option><option value="2">Февраль</option><option value="3">Март</option>
+                    <option value="4">Апрель</option><option value="5">Май</option><option value="6">Июнь</option>
+                    <option value="7">Июль</option><option value="8">Август</option><option value="9">Сентябрь</option>
+                    <option value="10">Октябрь</option><option value="11">Ноябрь</option><option value="12">Декабрь</option>
+                </select>
+            </div>
+            <div class="filter-buttons">
+                <button class="btn" id="applyFilters">🔍 Применить</button>
+                <button class="btn btn-outline" id="resetFilters">↺ Сбросить</button>
+                <button class="btn btn-outline" id="sendTelegramBtn">📨 Отправить сегодняшних в Telegram</button>
+            </div>
         </div>
     </div>
 
-    <script>
+    <div class="table-card">
+        <table id="dataTable" class="display" style="width:100%">
+            <thead>
+                <tr><th>Дата и время</th><th>Табельный №</th><th>Ф.И.О.</th><th>Подразделение</th>
+                    <th>Огневая ОЭТ</th><th>Блочное обучение</th><th>Радиосвязь</th>
+                    <th>Учения</th><th>Контраварийная</th><th>Модуль 1</th><th>ЕПП</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+            <tfoot>
+                <tr><th><input type="text" placeholder="Дата/время"></th><th><input type="text" placeholder="Таб.№"></th>
+                    <th><input type="text" placeholder="Ф.И.О."></th><th><input type="text" placeholder="Подразделение"></th>
+                    <th><input type="text" placeholder="Огневая"></th><th><input type="text" placeholder="Блочное"></th>
+                    <th><input type="text" placeholder="Радиосвязь"></th><th><input type="text" placeholder="Учения"></th>
+                    <th><input type="text" placeholder="Контравар."></th><th><input type="text" placeholder="Модуль 1"></th>
+                    <th><input type="text" placeholder="ЕПП"></th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+
+<script>
     let table;
     let datePicker;
     let allGosb = [];
 
+    // ========== Загрузка списка ГОСБ ==========
     async function loadGosbList() {
-        const response = await fetch('/api/gosb-list');
-        const data = await response.json();
+        const resp = await fetch('/api/gosb-list');
+        const data = await resp.json();
         allGosb = data;
         const select = document.getElementById('gosbSelect');
         data.forEach(g => {
-            const option = document.createElement('option');
-            option.value = g.name;
-            option.textContent = g.name;
-            select.appendChild(option);
+            const opt = document.createElement('option');
+            opt.value = g.name;
+            opt.textContent = g.name;
+            select.appendChild(opt);
         });
     }
 
-    // Загрузка городов при выборе ГОСБ
+    // ========== Подгрузка КИЦ при выборе ГОСБ ==========
     document.getElementById('gosbSelect').addEventListener('change', async function() {
         const gosbName = this.value;
         const kicSelect = document.getElementById('kicSelect');
@@ -364,7 +285,7 @@
         kicSelect.disabled = false;
     });
 
-    // Инициализация flatpickr
+    // ========== flatpickr ==========
     function initDatePicker() {
         datePicker = flatpickr("#datePicker", {
             locale: "ru",
@@ -374,7 +295,6 @@
         });
     }
 
-    // Форматирование даты для API (YYYY-MM-DD)
     function formatDateForApi(dateStr) {
         if (!dateStr) return null;
         const parts = dateStr.split('.');
@@ -382,7 +302,7 @@
         return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
 
-    // Загрузка данных таблицы с фильтрами
+    // ========== Загрузка данных в таблицу ==========
     async function loadTableData() {
         const gosb = document.getElementById('gosbSelect').value;
         const city = document.getElementById('kicSelect').value;
@@ -429,9 +349,8 @@
                 data: tableData,
                 columns: [
                     { title: "Дата и время" }, { title: "Табельный №" }, { title: "Ф.И.О." }, { title: "Подразделение" },
-                    { title: "Огневая ОЭТ, VR-тренажер/ (УТС автомат)" }, { title: "Блочное обучение" },
-                    { title: "Радиосвязь и мониторинг" }, { title: "Учения по мониторингу и взаимодействию с СЦ ЦМИ" },
-                    { title: "Контраварийная подготовка" }, { title: "Модуль 1" }, { title: "ЕПП" }
+                    { title: "Огневая ОЭТ" }, { title: "Блочное обучение" }, { title: "Радиосвязь" },
+                    { title: "Учения" }, { title: "Контраварийная" }, { title: "Модуль 1" }, { title: "ЕПП" }
                 ],
                 order: [[0, 'desc']],
                 language: {
@@ -440,25 +359,23 @@
                     info: "Записи с _START_ по _END_ из _TOTAL_",
                     paginate: { first: "Первая", last: "Последняя", next: "→", previous: "←" }
                 },
-                initComplete: function () {
-                    this.api().columns().every(function () {
+                initComplete: function() {
+                    this.api().columns().every(function() {
                         let column = this;
                         let input = $(column.footer()).find('input');
-                        input.on('keyup change', function () {
+                        input.on('keyup change', function() {
                             column.search(this.value).draw();
                         });
                     });
                 }
             });
             $('.dataTables_filter').hide();
-            // Добавляем счетчик записей
             const lengthDiv = $('.dataTables_length');
             if (lengthDiv.length && $('#recordsCounter').length === 0) {
                 lengthDiv.after('<span id="recordsCounter" class="records-counter">Всего: <span class="total-count">0</span> чел.</span>');
             }
         }
 
-        // Обновляем счетчик
         const filteredCount = table.rows({ search: 'applied' }).count();
         $('#recordsCounter .total-count').text(filteredCount);
     }
@@ -475,16 +392,20 @@
         loadTableData();
     }
 
-    // Обработчик кнопки отправки отчёта за сегодня
-    document.getElementById('sendTodayReportBtn').addEventListener('click', async function() {
+    // ========== Отправка сегодняшних регистраций в Telegram ==========
+    document.getElementById('sendTelegramBtn').addEventListener('click', async function() {
         const btn = this;
         btn.disabled = true;
         btn.textContent = '⏳ Отправка...';
+        
         try {
-            const resp = await fetch('/api/send-today-report', { method: 'POST' });
+            const resp = await fetch('/api/send-today-reports', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
             const result = await resp.json();
             if (result.status === 'ok') {
-                alert(`Отчёт отправлен! Отправлено: ${result.sent} из ${result.total_gosb} ГОСБ`);
+                alert(`Отчёты отправлены в ${result.sent} чатов`);
             } else {
                 alert('Ошибка: ' + (result.message || 'неизвестная ошибка'));
             }
@@ -492,7 +413,7 @@
             alert('Ошибка соединения: ' + err.message);
         } finally {
             btn.disabled = false;
-            btn.textContent = '📨 Отправить отчёт за сегодня';
+            btn.textContent = '📨 Отправить сегодняшних в Telegram';
         }
     });
 
@@ -503,6 +424,6 @@
         document.getElementById('applyFilters').addEventListener('click', loadTableData);
         document.getElementById('resetFilters').addEventListener('click', resetFilters);
     };
-    </script>
+</script>
 </body>
 </html>

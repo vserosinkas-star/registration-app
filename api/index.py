@@ -166,6 +166,17 @@ def pluralize(n, one, few, many):
         return one
     return many
 
+def send_telegram_to_gosb(gosb, message):
+    """
+    Отправляет сообщение основному получателю ГОСБ и в копию (если указана).
+    """
+    # Основной получатель
+    if gosb.get('chat_id'):
+        send_telegram_message(gosb['chat_id'], message)
+    # Копия
+    if gosb.get('copy_chat_id'):
+        send_telegram_message(gosb['copy_chat_id'], message)
+
 # ========== МАРШРУТЫ ==========
 @app.route('/')
 def dashboard():
@@ -321,20 +332,20 @@ def search_employees():
 # ========== ЕЖЕДНЕВНЫЙ ОТЧЁТ ПО РАСПИСАНИЮ (CRON) ==========
 @app.route('/api/send-daily-reports', methods=['GET'])
 def send_daily_reports():
-    """Отправляет отчёты за вчерашний день каждому ГОСБ в свой чат"""
+    """Отправляет отчёты за вчерашний день каждому ГОСБ в свой чат и копию"""
     if not supabase:
         return jsonify({"error": "База данных не инициализирована"}), 500
     
-    # Получаем все ГОСБ с chat_id
-    gosb_res = supabase.table('gosb').select('id, name, slug, chat_id').not_.is_('chat_id', 'null').execute()
+    # Получаем все ГОСБ с chat_id (copy_chat_id может быть NULL)
+    gosb_res = supabase.table('gosb').select('id, name, slug, chat_id, copy_chat_id').not_.is_('chat_id', 'null').execute()
     if not gosb_res.data:
         return jsonify({"message": "Нет получателей"}), 200
     
-    # Дата за вчера
     yesterday = date.today() - timedelta(days=1)
     yesterday_str = yesterday.strftime('%Y-%m-%d')
     
-    # Получаем все регистрации за вчера
+    # Получаем все регистрации за вчера (timestamp хранится в UTC)
+    # Используем фильтр по дате (строка ISO)
     report_res = supabase.table('report').select('*').gte('timestamp', yesterday_str).lte('timestamp', yesterday_str + ' 23:59:59').execute()
     registrations = report_res.data
     
@@ -349,15 +360,13 @@ def send_daily_reports():
     sent_count = 0
     for gosb in gosb_res.data:
         gosb_name = gosb['name']
-        chat_id = gosb['chat_id']
         regs = by_gosb.get(gosb_name, [])
         if not regs:
             continue
         message = format_report_message(regs)
         if message:
-            # Добавляем заголовок с датой
             full_message = f"🏢 {gosb_name} — регистрация на {yesterday.strftime('%d.%m.%Y')}\n\n{message}"
-            send_telegram_message(chat_id, full_message)
+            send_telegram_to_gosb(gosb, full_message)
             sent_count += 1
     
     return jsonify({"status": "ok", "sent": sent_count}), 200
@@ -365,24 +374,20 @@ def send_daily_reports():
 # ========== ОТПРАВКА ОТЧЁТА ЗА СЕГОДНЯ (КНОПКА) ==========
 @app.route('/api/send-today-reports', methods=['POST'])
 def send_today_reports():
-    """Отправляет отчёты за сегодня каждому ГОСБ в свой чат (по нажатию кнопки)"""
+    """Отправляет отчёты за сегодня каждому ГОСБ в свой чат и копию (по нажатию кнопки)"""
     if not supabase:
         return jsonify({"error": "База данных не инициализирована"}), 500
     
-    # Получаем все ГОСБ с chat_id
-    gosb_res = supabase.table('gosb').select('id, name, slug, chat_id').not_.is_('chat_id', 'null').execute()
+    gosb_res = supabase.table('gosb').select('id, name, slug, chat_id, copy_chat_id').not_.is_('chat_id', 'null').execute()
     if not gosb_res.data:
         return jsonify({"message": "Нет получателей"}), 200
     
-    # Сегодняшняя дата (в UTC, но потом при фильтрации будет переведено в Екатеринбург)
     today = date.today()
     today_str = today.strftime('%Y-%m-%d')
     
-    # Получаем все регистрации за сегодня
     report_res = supabase.table('report').select('*').gte('timestamp', today_str).lte('timestamp', today_str + ' 23:59:59').execute()
     registrations = report_res.data
     
-    # Группируем по gosb_name
     by_gosb = {}
     for reg in registrations:
         gosb_name = reg.get('gosb_name')
@@ -393,15 +398,13 @@ def send_today_reports():
     sent_count = 0
     for gosb in gosb_res.data:
         gosb_name = gosb['name']
-        chat_id = gosb['chat_id']
         regs = by_gosb.get(gosb_name, [])
         if not regs:
             continue
         message = format_report_message(regs)
         if message:
-            # Добавляем заголовок с датой
             full_message = f"🏢 {gosb_name} — регистрация на {today.strftime('%d.%m.%Y')}\n\n{message}"
-            send_telegram_message(chat_id, full_message)
+            send_telegram_to_gosb(gosb, full_message)
             sent_count += 1
     
     return jsonify({"status": "ok", "sent": sent_count}), 200

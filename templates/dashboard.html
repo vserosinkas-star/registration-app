@@ -4,22 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>AI Сводная панель обучения (сетка)</title>
-    
+
     <!-- DataTables -->
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
-    <!-- flatpickr (всплывающий календарь) -->
+    <!-- flatpickr -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
-    <!-- Шрифты -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://npmcdn.com/flatpickr/dist/l10n/ru.js"></script>
-    
+
     <style>
-        /* все стили остаются без изменений (как в предыдущей версии) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Inter', sans-serif;
@@ -72,8 +70,8 @@
             transition: all 0.2s; outline: none;
         }
         .filter-item select option { background: #1a1a2e; color: #fff; }
-        .filter-item input.flatpickr-input { 
-            cursor: pointer; 
+        .filter-item input.flatpickr-input {
+            cursor: pointer;
             background: rgba(10, 10, 20, 0.5) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236c5ce7' stroke-width='2'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E") no-repeat right 10px center;
         }
         .filter-item input:focus, .filter-item select:focus {
@@ -148,7 +146,6 @@
             color: #a8ede0;
             font-weight: 600;
         }
-        /* flatpickr тёмная тема */
         .flatpickr-calendar {
             background: rgba(20, 20, 40, 0.95) !important;
             border: 1px solid rgba(108, 92, 231, 0.3) !important;
@@ -223,6 +220,13 @@
         </div>
     </div>
 
+    <!-- Блок статистики -->
+    <div id="statisticsCard" class="filters-card" style="display: none; margin-bottom: 1rem; padding: 1rem;">
+        <div style="font-size: 1.2rem; font-weight: 600;">
+            📊 Статистика: <span id="statText">Зарегистрировано X из Y сотрудников (Z%)</span>
+        </div>
+    </div>
+
     <div class="table-card">
         <table id="dataTable" class="display" style="width:100%">
             <thead>
@@ -250,7 +254,6 @@
     let datePicker;
     let allGosb = [];
 
-    // ========== Загрузка списка ГОСБ ==========
     async function loadGosbList() {
         const resp = await fetch('/api/gosb-list');
         const data = await resp.json();
@@ -264,7 +267,6 @@
         });
     }
 
-    // ========== Подгрузка КИЦ при выборе ГОСБ ==========
     document.getElementById('gosbSelect').addEventListener('change', async function() {
         const gosbName = this.value;
         const kicSelect = document.getElementById('kicSelect');
@@ -285,7 +287,6 @@
         kicSelect.disabled = false;
     });
 
-    // ========== flatpickr ==========
     function initDatePicker() {
         datePicker = flatpickr("#datePicker", {
             locale: "ru",
@@ -302,7 +303,44 @@
         return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
 
-    // ========== Загрузка данных в таблицу ==========
+    async function loadStatistics() {
+        const gosb = document.getElementById('gosbSelect').value;
+        const city = document.getElementById('kicSelect').value;
+        const year = document.getElementById('yearFilter').value;
+        const quarter = document.getElementById('quarterFilter').value;
+        const month = document.getElementById('monthFilter').value;
+        const exactDate = formatDateForApi(document.getElementById('datePicker').value);
+
+        if (!gosb && !city) {
+            document.getElementById('statisticsCard').style.display = 'none';
+            return;
+        }
+
+        let url = '/api/statistics?';
+        const params = new URLSearchParams();
+        if (gosb) params.append('gosb', gosb);
+        if (city) params.append('city', city);
+        if (year) params.append('year', year);
+        if (quarter) params.append('quarter', quarter);
+        if (month) params.append('month', month);
+        if (exactDate) params.append('exact_date', exactDate);
+        url += params.toString();
+
+        try {
+            const resp = await fetch(url);
+            const stats = await resp.json();
+            const statCard = document.getElementById('statisticsCard');
+            if (stats.total_employees > 0) {
+                document.getElementById('statText').innerHTML = `Зарегистрировано <strong>${stats.registered_unique}</strong> из <strong>${stats.total_employees}</strong> сотрудников (<strong>${stats.percentage}%</strong>)`;
+                statCard.style.display = 'block';
+            } else {
+                statCard.style.display = 'none';
+            }
+        } catch (err) {
+            console.error('Ошибка загрузки статистики:', err);
+        }
+    }
+
     async function loadTableData() {
         const gosb = document.getElementById('gosbSelect').value;
         const city = document.getElementById('kicSelect').value;
@@ -359,11 +397,11 @@
                     info: "Записи с _START_ по _END_ из _TOTAL_",
                     paginate: { first: "Первая", last: "Последняя", next: "→", previous: "←" }
                 },
-                initComplete: function() {
-                    this.api().columns().every(function() {
+                initComplete: function () {
+                    this.api().columns().every(function () {
                         let column = this;
                         let input = $(column.footer()).find('input');
-                        input.on('keyup change', function() {
+                        input.on('keyup change', function () {
                             column.search(this.value).draw();
                         });
                     });
@@ -390,14 +428,13 @@
         document.getElementById('monthFilter').value = '';
         if (datePicker) datePicker.clear();
         loadTableData();
+        loadStatistics();
     }
 
-    // ========== Отправка сегодняшних регистраций в Telegram ==========
     document.getElementById('sendTelegramBtn').addEventListener('click', async function() {
         const btn = this;
         btn.disabled = true;
         btn.textContent = '⏳ Отправка...';
-        
         try {
             const resp = await fetch('/api/send-today-reports', {
                 method: 'POST',
@@ -421,8 +458,14 @@
         initDatePicker();
         await loadGosbList();
         await loadTableData();
-        document.getElementById('applyFilters').addEventListener('click', loadTableData);
-        document.getElementById('resetFilters').addEventListener('click', resetFilters);
+        await loadStatistics();
+        document.getElementById('applyFilters').addEventListener('click', () => {
+            loadTableData();
+            loadStatistics();
+        });
+        document.getElementById('resetFilters').addEventListener('click', () => {
+            resetFilters();
+        });
     };
 </script>
 </body>

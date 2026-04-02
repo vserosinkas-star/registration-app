@@ -54,25 +54,62 @@ def get_cities_by_gosb(gosb_id):
 
 def reverse_geocode(lat, lng):
     try:
-        import requests
-        url = f"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={lat}&lon={lng}&accept-language=ru&zoom=18"
-        r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
-        if r.status_code == 200:
-            data = r.json()
-            addr = data.get('address', {})
-            parts = []
-            if addr.get('road'): parts.append(addr['road'])
-            if addr.get('house_number'): parts.append('д. ' + addr['house_number'])
-            city = addr.get('city') or addr.get('town') or addr.get('village')
-            if city:
-                parts.insert(0, city + ',')
-            full = ' '.join(parts).strip()
-            if full:
-                return full
-        return f"шир. {lat:.5f} • долг. {lng:.5f}"
+        # Преобразуем в float (если пришли строки)
+        lat = float(lat)
+        lng = float(lng)
+        lat_fixed = round(lat, 5)
+        lng_fixed = round(lng, 5)
+        
+        url = f"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={lat_fixed}&lon={lng_fixed}&accept-language=ru&zoom=18&addressdetails=1"
+        headers = {'User-Agent': 'Mozilla/5.0 (compatible; RegistrationApp/1.0)'}
+        
+        response = requests.get(url, headers=headers, timeout=15)
+        if response.status_code == 200:
+            data = response.json()
+            if data and data.get('address'):
+                addr = data['address']
+                parts = []
+                
+                # Улица и номер дома
+                road = addr.get('road')
+                house = addr.get('house_number')
+                if road:
+                    parts.append(road)
+                if house:
+                    parts.append('д. ' + house)
+                
+                # Город / населённый пункт
+                city = addr.get('city') or addr.get('town') or addr.get('village') or addr.get('hamlet')
+                if city:
+                    if parts:
+                        parts.insert(0, city + ',')
+                    else:
+                        parts.append(city)
+                
+                # Если адрес получился короткий, используем display_name
+                if len(parts) < 2 and data.get('display_name'):
+                    display = data['display_name']
+                    # Отсекаем страну и почтовый индекс
+                    display = display.split(', Россия')[0]
+                    display_parts = display.split(', ')
+                    if len(display_parts) >= 2:
+                        parts = [display_parts[0] + ',', display_parts[1]]
+                    else:
+                        parts = [display]
+                
+                full = ' '.join(parts).strip()
+                if full:
+                    # Заменяем запятые на • для читаемости
+                    full = full.replace(',', ' •')
+                    return full
+        
+        # Если не удалось получить адрес, возвращаем координаты
+        return f"шир. {lat_fixed} • долг. {lng_fixed}"
+    
     except Exception as e:
         logging.error(f"reverse_geocode error: {e}")
-        return f"шир. {lat:.5f} • долг. {lng:.5f}"
+        # В случае ошибки возвращаем координаты
+        return f"шир. {round(float(lat),5)} • долг. {round(float(lng),5)}"
 
 def fill_report_record(reg_id, reg_data, gosb_name):
     if not supabase:

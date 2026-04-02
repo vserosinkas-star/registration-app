@@ -303,7 +303,7 @@
         return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
 
-    async function loadStatistics() {
+async function loadStatistics() {
     const gosb = document.getElementById('gosbSelect').value;
     const city = document.getElementById('kicSelect').value;
     const year = document.getElementById('yearFilter').value;
@@ -311,6 +311,7 @@
     const month = document.getElementById('monthFilter').value;
     const exactDate = formatDateForApi(document.getElementById('datePicker').value);
 
+    // Если не выбран ни ГОСБ, ни КИЦ – скрываем статистику
     if (!gosb && !city) {
         document.getElementById('statisticsCard').style.display = 'none';
         return;
@@ -326,21 +327,23 @@
     if (exactDate) params.append('exact_date', exactDate);
     url += params.toString();
 
-    console.log("Statistics URL:", url);  // ОТЛАДКА
-
     try {
         const resp = await fetch(url);
         const stats = await resp.json();
-        console.log("Statistics response:", stats);  // ОТЛАДКА
+        console.log('Statistics response:', stats); // для отладки
         const statCard = document.getElementById('statisticsCard');
+        const statText = document.getElementById('statText');
         if (stats.total_employees > 0) {
-            document.getElementById('statText').innerHTML = `Зарегистрировано <strong>${stats.registered_unique}</strong> из <strong>${stats.total_employees}</strong> сотрудников (<strong>${stats.percentage}%</strong>)`;
+            statText.innerHTML = `Зарегистрировано <strong>${stats.registered_unique}</strong> из <strong>${stats.total_employees}</strong> сотрудников (<strong>${stats.percentage}%</strong>)`;
             statCard.style.display = 'block';
         } else {
-            statCard.style.display = 'none';
+            // Если нет сотрудников в БД, показываем сообщение
+            statText.innerHTML = `⚠️ Нет данных о сотрудниках для выбранного подразделения.`;
+            statCard.style.display = 'block';
         }
     } catch (err) {
         console.error('Ошибка загрузки статистики:', err);
+        document.getElementById('statisticsCard').style.display = 'none';
     }
 }
 

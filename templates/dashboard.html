@@ -216,7 +216,7 @@
                 <button class="btn" id="applyFilters">🔍 Применить</button>
                 <button class="btn btn-outline" id="resetFilters">↺ Сбросить</button>
                 <button class="btn btn-outline" id="refreshBtn">🔄 Обновить из базы</button>
-                <button class="btn btn-outline" id="sendTelegramBtn">📨 Отправить сегодняшних в Telegram</button>
+                <button class="btn btn-outline" id="sendTelegramBtn">📨 Отправить в СберЧат</button>
             </div>
         </div>
     </div>
@@ -462,7 +462,7 @@
             alert('Ошибка соединения: ' + err.message);
         } finally {
             btn.disabled = false;
-            btn.textContent = '📨 Отправить сегодняшних в Telegram';
+            btn.textContent = '📨 Отправить в СберЧат';
         }
     });
 

@@ -8,7 +8,7 @@ import pytz
 import requests
 import io
 import openpyxl
-from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from openpyxl.styles import Font, Alignment
 from openpyxl.utils import get_column_letter
 
 # Настройка логирования
@@ -17,7 +17,7 @@ logging.basicConfig(level=logging.INFO)
 app = Flask(__name__, template_folder='../templates')
 CORS(app)
 
-# ========== ПРОВЕРКА ПЕРЕМЕННЫХ ОКРУЖЕНИЯ ==========
+# ========== ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ ==========
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -111,7 +111,7 @@ def fill_report_record(reg_id, reg_data, gosb_name):
         return
     purpose = reg_data['purpose']
 
-    # Проверяем, существует ли уже запись в report с таким registration_id
+    # Проверка дубликата по registration_id
     existing = supabase.table('report').select('id').eq('registration_id', reg_id).execute()
     if existing.data:
         logging.info(f"Запись для registration_id={reg_id} уже существует, пропускаем.")
@@ -200,13 +200,13 @@ def send_telegram_to_gosb(gosb, message):
         send_telegram_message(gosb['copy_chat_id'], message)
 
 # ========== ЭКСПОРТ В EXCEL ПО ШАБЛОНУ ==========
-def create_excel_from_data(data_rows, gosb_name=None):
+def create_excel_from_data(data_rows):
     """
     Создаёт Excel-файл по шаблону: строки соответствуют структуре:
     Дата и время, Табельный №, Ф.И.О., Подразделение, Огневая ОЭТ, Блочное обучение,
     Радиосвязь, Учения, Контраварийная, Модуль 1, ЕПП.
     """
-    # Загружаем шаблон (если есть), иначе создаём новый
+    # Пытаемся загрузить шаблон
     template_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'Шаблон в УЦ.xlsx')
     if os.path.exists(template_path):
         wb = openpyxl.load_workbook(template_path)
@@ -225,11 +225,9 @@ def create_excel_from_data(data_rows, gosb_name=None):
             cell = ws.cell(row=1, column=col, value=header)
             cell.font = Font(bold=True)
             cell.alignment = Alignment(horizontal='center')
-        # Также добавим строку с подсказками (как в шаблоне) – упрощённо
         ws.cell(row=2, column=1, value="Пример: 01.01.2026 10:00")
 
-    # Находим строку, с которой начинаются данные (после заголовков)
-    # В шаблоне данные начинаются с 5-й строки (после объединённых ячеек)
+    # Определяем строку, с которой начинаются данные (в шаблоне обычно после объединённых ячеек)
     start_row = 5
     # Если строки уже есть, удаляем их (кроме заголовков)
     if ws.max_row >= start_row:
@@ -237,13 +235,9 @@ def create_excel_from_data(data_rows, gosb_name=None):
 
     # Заполняем данными
     for row_idx, row_data in enumerate(data_rows, start=start_row):
-        # row_data ожидается в формате: [timestamp, tab_number, fio, subdivision, fire_training, block_training, radio_comm, drills, emergency, module1, epp]
         for col_idx, value in enumerate(row_data, 1):
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
-            cell.alignment = Alignment(horizontal='center' if col_idx in [1,2,3,4] else 'center')
-            if col_idx == 1 and isinstance(value, str) and ':' in value:
-                # дата и время
-                pass
+            cell.alignment = Alignment(horizontal='center')
 
     # Автоширина колонок
     for col in ws.columns:
@@ -255,7 +249,6 @@ def create_excel_from_data(data_rows, gosb_name=None):
         adjusted_width = min(max_length + 2, 40)
         ws.column_dimensions[col_letter].width = adjusted_width
 
-    # Сохраняем в BytesIO
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
@@ -393,7 +386,7 @@ def get_report_data():
             if month and str(yekat_dt.month) != month:
                 continue
             filtered.append(row)
-        # Дедупликация по registration_id (на случай, если в БД всё же попали дубликаты)
+        # Дедупликация по registration_id
         unique = {}
         for row in filtered:
             rid = row.get('registration_id')
@@ -433,6 +426,7 @@ def get_statistics():
     month = request.args.get('month')
     exact_date = request.args.get('exact_date')
 
+    # Общее число сотрудников
     emp_query = supabase.table('employees').select('fio, tab_number, kic_pi, gosb_name')
     if gosb_name:
         emp_query = emp_query.eq('gosb_name', gosb_name)
@@ -447,6 +441,7 @@ def get_statistics():
             employee_ids.add(e['fio'].strip().lower())
     total_employees = len(employee_ids)
 
+    # Уникальные регистрации за период
     report_query = supabase.table('report').select('fio, tab_number, subdivision, timestamp, registration_id')
     if gosb_name:
         report_query = report_query.eq('gosb_name', gosb_name)
@@ -501,24 +496,11 @@ def get_statistics():
 
 @app.route('/api/export-excel', methods=['POST'])
 def export_excel():
-    """
-    Принимает JSON с массивом строк таблицы и возвращает Excel-файл.
-    Ожидает: { "data": [[...], [...]] }
-    """
     data = request.get_json()
     rows = data.get('data', [])
     if not rows:
         return jsonify({"error": "Нет данных для экспорта"}), 400
-
-    # Преобразуем в формат, ожидаемый create_excel_from_data
-    excel_data = []
-    for row in rows:
-        # row приходит в том же порядке, что и в таблице:
-        # timestamp, tab_number, fio, subdivision, fire_training, block_training,
-        # radio_comm, drills, emergency, module1, epp
-        excel_data.append(row)
-
-    excel_file = create_excel_from_data(excel_data)
+    excel_file = create_excel_from_data(rows)
     return send_file(
         excel_file,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

@@ -7,30 +7,29 @@ from datetime import datetime, date, timedelta
 import pytz
 import requests
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__, template_folder='../templates')
 CORS(app)
 
-# ========== ПРОВЕРКА ПЕРЕМЕННЫХ ОКРУЖЕНИЯ ==========
+# === Конфигурация ===
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 
 if not SUPABASE_URL or not SUPABASE_KEY:
-    logging.error("Missing SUPABASE_URL or SUPABASE_KEY environment variables")
+    logging.error("Missing SUPABASE_URL or SUPABASE_KEY")
     supabase = None
 else:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
     logging.info("Supabase client initialized")
 
 if not TELEGRAM_BOT_TOKEN:
-    logging.warning("TELEGRAM_BOT_TOKEN not set. Telegram messages will not be sent.")
+    logging.warning("TELEGRAM_BOT_TOKEN not set")
 
 YEKAT_TIMEZONE = pytz.timezone('Asia/Yekaterinburg')
 
-# ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+# === Вспомогательные функции ===
 def get_gosb_by_slug(slug):
     if not supabase:
         return None
@@ -53,10 +52,8 @@ def get_cities_by_gosb(gosb_id):
 
 def reverse_geocode(lat, lng):
     try:
-        lat = float(lat)
-        lng = float(lng)
-        lat_fixed = round(lat, 5)
-        lng_fixed = round(lng, 5)
+        lat = float(lat); lng = float(lng)
+        lat_fixed = round(lat, 5); lng_fixed = round(lng, 5)
         url = f"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={lat_fixed}&lon={lng_fixed}&accept-language=ru&zoom=18&addressdetails=1"
         headers = {'User-Agent': 'Mozilla/5.0 (compatible; RegistrationApp/1.0)'}
         response = requests.get(url, headers=headers, timeout=15)
@@ -65,38 +62,26 @@ def reverse_geocode(lat, lng):
             if data and data.get('address'):
                 addr = data['address']
                 parts = []
-                road = addr.get('road')
-                house = addr.get('house_number')
-                if road:
-                    parts.append(road)
-                if house:
-                    parts.append('д. ' + house)
+                road = addr.get('road'); house = addr.get('house_number')
+                if road: parts.append(road)
+                if house: parts.append('д. ' + house)
                 city = addr.get('city') or addr.get('town') or addr.get('village') or addr.get('hamlet')
                 if city:
-                    if parts:
-                        parts.insert(0, city + ',')
-                    else:
-                        parts.append(city)
+                    if parts: parts.insert(0, city + ',')
+                    else: parts.append(city)
                 if len(parts) < 2 and data.get('display_name'):
-                    display = data['display_name']
-                    display = display.split(', Россия')[0]
+                    display = data['display_name'].split(', Россия')[0]
                     display_parts = display.split(', ')
-                    if len(display_parts) >= 2:
-                        parts = [display_parts[0] + ',', display_parts[1]]
-                    else:
-                        parts = [display]
-                full = ' '.join(parts).strip()
-                if full:
-                    full = full.replace(',', ' •')
-                    return full
+                    parts = [display_parts[0] + ',', display_parts[1]] if len(display_parts) >= 2 else [display]
+                full = ' '.join(parts).strip().replace(',', ' •')
+                if full: return full
         return f"шир. {lat_fixed} • долг. {lng_fixed}"
     except Exception as e:
         logging.error(f"reverse_geocode error: {e}")
         return f"шир. {round(float(lat),5)} • долг. {round(float(lng),5)}"
 
 def fill_report_record(reg_id, reg_data, gosb_name):
-    if not supabase:
-        return
+    if not supabase: return
     purpose = reg_data['purpose']
     employee_data = {}
     if reg_data.get('employee_id'):
@@ -131,32 +116,25 @@ def fill_report_record(reg_id, reg_data, gosb_name):
         logging.error(f"fill_report_record error: {e}")
 
 def send_telegram_message(chat_id, text):
-    if not TELEGRAM_BOT_TOKEN:
-        logging.error("TELEGRAM_BOT_TOKEN не задан")
-        return
+    if not TELEGRAM_BOT_TOKEN: return
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}
     try:
-        r = requests.post(url, json=payload, timeout=10)
-        r.raise_for_status()
+        requests.post(url, json=payload, timeout=10).raise_for_status()
         logging.info(f"Сообщение отправлено в {chat_id}")
     except Exception as e:
         logging.error(f"Ошибка отправки в Telegram {chat_id}: {e}")
 
 def format_report_message(registrations):
-    if not registrations:
-        return None
+    if not registrations: return None
     kic_groups = {}
     for reg in registrations:
         kic = reg.get('subdivision') or 'Без КИЦ'
-        if kic not in kic_groups:
-            kic_groups[kic] = []
-        kic_groups[kic].append(reg['fio'])
+        kic_groups.setdefault(kic, []).append(reg['fio'])
     lines = []
     for kic, fios in sorted(kic_groups.items()):
         lines.append(f"🟢 КИЦ {kic}")
-        for fio in fios:
-            lines.append(f"👮 {fio}")
+        lines.extend(f"👮 {fio}" for fio in fios)
         lines.append("")
     total = len(registrations)
     lines.append(f"📨 Итого: {total} {pluralize(total, 'человек', 'человека', 'человек')}")
@@ -165,12 +143,9 @@ def format_report_message(registrations):
 def pluralize(n, one, few, many):
     n = abs(n) % 100
     n1 = n % 10
-    if 10 < n < 20:
-        return many
-    if 1 < n1 < 5:
-        return few
-    if n1 == 1:
-        return one
+    if 10 < n < 20: return many
+    if 1 < n1 < 5: return few
+    if n1 == 1: return one
     return many
 
 def send_telegram_to_gosb(gosb, message):
@@ -179,45 +154,44 @@ def send_telegram_to_gosb(gosb, message):
     if gosb.get('copy_chat_id'):
         send_telegram_message(gosb['copy_chat_id'], message)
 
-# ========== ОБРАБОТКА НЕПРОЦЕССИРОВАННЫХ РЕГИСТРАЦИЙ ==========
-@app.route('/api/process-pending', methods=['GET', 'POST'])
+# === Обработка непроцессированных регистраций ===
+@app.route('/api/process-pending', methods=['POST'])
 def process_pending():
-    """Обрабатывает все записи в registrations с processed = FALSE"""
     if not supabase:
-        return jsonify({"error": "База данных не инициализирована"}), 500
-    # Получаем непроцессированные записи
+        return jsonify({"status": "error", "message": "База данных не инициализирована"}), 500
+
+    # Получаем все непроцессированные регистрации (processed = false)
     pending = supabase.table('registrations').select('*').eq('processed', False).execute()
     if not pending.data:
-        return jsonify({"message": "Нет непроцессированных записей"}), 200
+        return jsonify({"status": "ok", "message": "Нет новых записей", "processed": 0}), 200
+
     processed_count = 0
     for reg in pending.data:
         try:
-            # Получаем название ГОСБ через city_id
-            city_res = supabase.table('cities').select('id, name, gosb_id').eq('id', reg['city_id']).execute()
+            # Получаем название ГОСБ через city_id (cities -> gosb)
+            city_res = supabase.table('cities').select('gosb_id').eq('id', reg['city_id']).execute()
             if not city_res.data:
-                logging.warning(f"Город не найден для city_id {reg['city_id']}, пропускаем")
+                logging.warning(f"Город не найден для city_id {reg['city_id']}")
                 continue
-            gosb_res = supabase.table('gosb').select('id, name').eq('id', city_res.data[0]['gosb_id']).execute()
+            gosb_id = city_res.data[0]['gosb_id']
+            gosb_res = supabase.table('gosb').select('name').eq('id', gosb_id).execute()
             if not gosb_res.data:
-                logging.warning(f"ГОСБ не найден для gosb_id {city_res.data[0]['gosb_id']}, пропускаем")
+                logging.warning(f"ГОСБ не найден для gosb_id {gosb_id}")
                 continue
             gosb_name = gosb_res.data[0]['name']
-            # Подготавливаем reg_data для fill_report_record
-            reg_data = {
-                'purpose': reg['purpose'],
-                'employee_id': reg.get('employee_id'),
-                'timestamp': reg['timestamp'],
-                'fio': reg['fio']
-            }
-            fill_report_record(reg['id'], reg_data, gosb_name)
-            # Помечаем как обработанное
+
+            # Вызываем fill_report_record
+            fill_report_record(reg['id'], reg, gosb_name)
+
+            # Помечаем как обработанную
             supabase.table('registrations').update({'processed': True}).eq('id', reg['id']).execute()
             processed_count += 1
         except Exception as e:
             logging.error(f"Ошибка обработки регистрации {reg['id']}: {e}")
-    return jsonify({"status": "ok", "processed": processed_count}), 200
 
-# ========== МАРШРУТЫ ==========
+    return jsonify({"status": "ok", "message": f"Обработано {processed_count} записей", "processed": processed_count}), 200
+
+# === Остальные маршруты (без изменений, кроме удаления lat/lng из api_register) ===
 @app.route('/')
 def dashboard():
     return render_template('dashboard.html')
@@ -258,16 +232,16 @@ def api_register():
         'purpose': purpose,
         'address': address,
         'timestamp': datetime.utcnow().isoformat(),
-        'employee_id': employee_id if employee_id else None
+        'employee_id': employee_id if employee_id else None,
+        'processed': False
     }
     try:
         result = supabase.table('registrations').insert(reg_data).execute()
         if not result.data:
             return jsonify({'status': 'error', 'message': 'Ошибка сохранения'}), 500
+        # Автоматически обработаем эту запись сразу (чтобы не ждать кнопки)
         reg_id = result.data[0]['id']
-        # Сразу обрабатываем
         fill_report_record(reg_id, reg_data, gosb['name'])
-        # Помечаем как обработанное
         supabase.table('registrations').update({'processed': True}).eq('id', reg_id).execute()
         return jsonify({
             'status': 'success',
@@ -382,7 +356,6 @@ def get_statistics():
     month = request.args.get('month')
     exact_date = request.args.get('exact_date')
 
-    # Общее число сотрудников
     emp_query = supabase.table('employees').select('fio, tab_number, kic_pi, gosb_name')
     if gosb_name:
         emp_query = emp_query.eq('gosb_name', gosb_name)
@@ -397,7 +370,6 @@ def get_statistics():
             employee_ids.add(e['fio'].strip().lower())
     total_employees = len(employee_ids)
 
-    # Регистрации
     report_query = supabase.table('report').select('fio, tab_number, subdivision, timestamp')
     if gosb_name:
         report_query = report_query.eq('gosb_name', gosb_name)
@@ -405,7 +377,7 @@ def get_statistics():
         report_query = report_query.ilike('subdivision', f'%{city}%')
     report_res = report_query.execute()
 
-    registered_ids = set()
+    filtered_regs = []
     for row in report_res.data:
         ts = row.get('timestamp')
         if not ts:
@@ -415,7 +387,6 @@ def get_statistics():
         except:
             continue
         yekat_dt = utc_dt.replace(tzinfo=pytz.UTC).astimezone(YEKAT_TIMEZONE)
-
         if exact_date and yekat_dt.date().isoformat() != exact_date:
             continue
         if year and str(yekat_dt.year) != year:
@@ -426,22 +397,24 @@ def get_statistics():
                 continue
         if month and str(yekat_dt.month) != month:
             continue
+        filtered_regs.append(row)
 
-        if row.get('tab_number'):
-            registered_ids.add(row['tab_number'])
-        elif row.get('fio'):
-            registered_ids.add(row['fio'].strip().lower())
+    registered_ids = set()
+    for reg in filtered_regs:
+        if reg.get('tab_number'):
+            registered_ids.add(reg['tab_number'])
+        elif reg.get('fio'):
+            registered_ids.add(reg['fio'].strip().lower())
     registered_count = len(registered_ids)
     percentage = (registered_count / total_employees * 100) if total_employees > 0 else 0
 
-    logging.info(f"Statistics: gosb={gosb_name}, city={city}, total_employees={total_employees}, registered={registered_count}")
     return jsonify({
         "total_employees": total_employees,
         "registered_unique": registered_count,
         "percentage": round(percentage, 1)
     })
 
-# ========== ОТПРАВКА В TELEGRAM ==========
+# === Telegram endpoints ===
 @app.route('/api/send-daily-reports', methods=['GET'])
 def send_daily_reports():
     if not supabase:
@@ -456,9 +429,7 @@ def send_daily_reports():
     by_gosb = {}
     for reg in registrations:
         gosb_name = reg.get('gosb_name')
-        if gosb_name not in by_gosb:
-            by_gosb[gosb_name] = []
-        by_gosb[gosb_name].append(reg)
+        by_gosb.setdefault(gosb_name, []).append(reg)
     sent_count = 0
     for gosb in gosb_res.data:
         regs = by_gosb.get(gosb['name'], [])
@@ -485,9 +456,7 @@ def send_today_reports():
     by_gosb = {}
     for reg in registrations:
         gosb_name = reg.get('gosb_name')
-        if gosb_name not in by_gosb:
-            by_gosb[gosb_name] = []
-        by_gosb[gosb_name].append(reg)
+        by_gosb.setdefault(gosb_name, []).append(reg)
     sent_count = 0
     for gosb in gosb_res.data:
         regs = by_gosb.get(gosb['name'], [])
@@ -500,11 +469,10 @@ def send_today_reports():
             sent_count += 1
     return jsonify({"status": "ok", "sent": sent_count}), 200
 
-# ========== ОТЛАДОЧНЫЙ МАРШРУТ ==========
 @app.route('/api/debug-supabase')
 def debug_supabase():
     if not supabase:
-        return jsonify({"error": "Supabase client not initialized"}), 500
+        return jsonify({"error": "Supabase client not initialized", "env": {"SUPABASE_URL": bool(SUPABASE_URL), "SUPABASE_KEY": bool(SUPABASE_KEY)}}), 500
     try:
         res = supabase.table('gosb').select('*').limit(1).execute()
         return jsonify({"status": "ok", "data": res.data})

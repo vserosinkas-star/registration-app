@@ -217,6 +217,7 @@
                 <button class="btn btn-outline" id="resetFilters">↺ Сбросить</button>
                 <button class="btn btn-outline" id="refreshBtn">🔄 Обновить из базы</button>
                 <button class="btn btn-outline" id="sendTelegramBtn">📨 Отправить в СберЧат</button>
+                <button class="btn btn-outline" id="exportExcelBtn">📊 Выгрузить в Excel</button>
             </div>
         </div>
     </div>
@@ -437,12 +438,13 @@
         loadStatistics();
     }
 
-    // Кнопка "Обновить из базы" – просто перезагружает данные
+    // Кнопка "Обновить из базы" – перезагружает данные без сброса фильтров
     document.getElementById('refreshBtn').addEventListener('click', () => {
         loadTableData();
         loadStatistics();
     });
 
+    // Кнопка отправки в СберЧат
     document.getElementById('sendTelegramBtn').addEventListener('click', async function() {
         const btn = this;
         btn.disabled = true;
@@ -463,6 +465,44 @@
         } finally {
             btn.disabled = false;
             btn.textContent = '📨 Отправить в СберЧат';
+        }
+    });
+
+    // Кнопка выгрузки в Excel
+    document.getElementById('exportExcelBtn').addEventListener('click', async function() {
+        const filteredData = table.rows({ search: 'applied' }).data().toArray();
+        if (filteredData.length === 0) {
+            alert('Нет данных для выгрузки');
+            return;
+        }
+        const btn = this;
+        btn.disabled = true;
+        btn.textContent = '⏳ Создание...';
+        try {
+            const resp = await fetch('/api/export-excel', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ data: filteredData })
+            });
+            if (resp.ok) {
+                const blob = await resp.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `report_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.xlsx`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+            } else {
+                const err = await resp.json();
+                alert('Ошибка при создании файла: ' + (err.message || 'неизвестная ошибка'));
+            }
+        } catch (err) {
+            alert('Ошибка соединения: ' + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '📊 Выгрузить в Excel';
         }
     });
 

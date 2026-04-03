@@ -224,7 +224,7 @@
     <!-- Блок статистики -->
     <div id="statisticsCard" class="filters-card" style="display: none; margin-bottom: 1rem; padding: 1rem;">
         <div style="font-size: 1.2rem; font-weight: 600;">
-            📊 Статистика: <span id="statText">Зарегистрировано X из Y сотрудников (Z%)</span>
+            📊 Статистика: <span id="statText">Обучено X из Y сотрудников (Z%)</span>
         </div>
     </div>
 
@@ -335,7 +335,7 @@
             const stats = await resp.json();
             const statCard = document.getElementById('statisticsCard');
             if (stats.total_employees > 0) {
-                document.getElementById('statText').innerHTML = `Зарегистрировано <strong>${stats.registered_unique}</strong> из <strong>${stats.total_employees}</strong> сотрудников (<strong>${stats.percentage}%</strong>)`;
+                document.getElementById('statText').innerHTML = `Обучено <strong>${stats.registered_unique}</strong> из <strong>${stats.total_employees}</strong> сотрудников (<strong>${stats.percentage}%</strong>)`;
                 statCard.style.display = 'block';
             } else {
                 document.getElementById('statText').innerHTML = `⚠️ Нет данных о сотрудниках для выбранного подразделения.`;

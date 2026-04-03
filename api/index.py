@@ -103,10 +103,16 @@ def reverse_geocode(lat, lng):
         return f"шир. {round(float(lat),5)} • долг. {round(float(lng),5)}"
 
 def fill_report_record(reg_id, reg_data, gosb_name):
+    """Создаёт запись в report, только если её ещё нет."""
     if not supabase:
         return
-    purpose = reg_data['purpose']
+    # Проверяем, существует ли уже запись с таким registration_id
+    existing = supabase.table('report').select('id').eq('registration_id', reg_id).execute()
+    if existing.data:
+        logging.info(f"Запись для registration_id {reg_id} уже существует в report, пропускаем.")
+        return
 
+    purpose = reg_data['purpose']
     employee_data = {}
     if reg_data.get('employee_id'):
         try:
@@ -135,10 +141,12 @@ def fill_report_record(reg_id, reg_data, gosb_name):
         row['module1'] = '40'
     elif purpose == 'ЕПП':
         row['epp'] = '8'
+
     try:
         supabase.table('report').insert(row).execute()
+        logging.info(f"Создана запись в report для registration_id {reg_id}")
     except Exception as e:
-        logging.error(f"fill_report_record error: {e}")
+        logging.error(f"Ошибка вставки в report: {e}")
 
 def send_telegram_message(chat_id, text):
     if not TELEGRAM_BOT_TOKEN:
@@ -233,11 +241,15 @@ def api_register():
         'employee_id': employee_id if employee_id else None
     }
     try:
+        # Вставляем запись в registrations
         result = supabase.table('registrations').insert(reg_data).execute()
         if not result.data:
             return jsonify({'status': 'error', 'message': 'Ошибка сохранения'}), 500
         reg_id = result.data[0]['id']
+        # Создаём запись в report (с проверкой дубликата внутри функции)
         fill_report_record(reg_id, reg_data, gosb['name'])
+        # Устанавливаем флаг processed = TRUE (опционально, если хотим отметить обработанные)
+        supabase.table('registrations').update({'processed': True}).eq('id', reg_id).execute()
         return jsonify({
             'status': 'success',
             'message': 'Регистрация успешна',
@@ -280,7 +292,7 @@ def get_report_data():
     if not supabase:
         return jsonify([])
     gosb = request.args.get('gosb')
-    city = request.args.get('city')          # ← название КИЦ (города)
+    city = request.args.get('city')
     fio = request.args.get('fio')
     year = request.args.get('year')
     quarter = request.args.get('quarter')
@@ -292,7 +304,6 @@ def get_report_data():
         if gosb:
             query = query.eq('gosb_name', gosb)
         if city:
-            # Фильтр по подразделению (КИЦ-ПИ) – ищем по частичному совпадению
             query = query.ilike('subdivision', f'%{city}%')
         if fio:
             query = query.ilike('fio', f'%{fio}%')
@@ -355,7 +366,7 @@ def get_statistics():
     month = request.args.get('month')
     exact_date = request.args.get('exact_date')
 
-    # ---------- 1. Общее число сотрудников в выбранном подразделении ----------
+    # Общее число сотрудников
     emp_query = supabase.table('employees').select('fio, tab_number, kic_pi, gosb_name')
     if gosb_name:
         emp_query = emp_query.eq('gosb_name', gosb_name)
@@ -370,13 +381,12 @@ def get_statistics():
             employee_ids.add(e['fio'].strip().lower())
     total_employees = len(employee_ids)
 
-    # ---------- 2. Уникальные регистрации за период ----------
+    # Уникальные регистрации
     report_query = supabase.table('report').select('fio, tab_number, subdivision, timestamp')
     if gosb_name:
         report_query = report_query.eq('gosb_name', gosb_name)
     if city:
         report_query = report_query.ilike('subdivision', f'%{city}%')
-
     report_res = report_query.execute()
 
     filtered_regs = []
@@ -412,7 +422,7 @@ def get_statistics():
 
     percentage = (registered_count / total_employees * 100) if total_employees > 0 else 0
 
-    logging.info(f"Statistics: gosb={gosb_name}, city={city}, total_employees={total_employees}, registered={registered_count}")
+    logging.info(f"Statistics: gosb={gosb_name}, city={city}, total={total_employees}, registered={registered_count}")
 
     return jsonify({
         "total_employees": total_employees,

@@ -229,10 +229,9 @@ def api_register():
         'city_id': city_id,
         'purpose': purpose,
         'address': address,
-        'latitude': lat,
-        'longitude': lng,
         'timestamp': datetime.utcnow().isoformat(),
         'employee_id': employee_id if employee_id else None
+        # latitude и longitude не сохраняются
     }
     try:
         result = supabase.table('registrations').insert(reg_data).execute()
@@ -358,7 +357,6 @@ def get_statistics():
     if gosb_name:
         emp_query = emp_query.eq('gosb_name', gosb_name)
     if city:
-        # Ищем по kic_pi (частичное совпадение, как и в report.subdivision)
         emp_query = emp_query.ilike('kic_pi', f'%{city}%')
     emp_res = emp_query.execute()
     employee_ids = set()
@@ -378,7 +376,6 @@ def get_statistics():
 
     report_res = report_query.execute()
 
-    # Фильтрация по дате
     filtered_regs = []
     for row in report_res.data:
         ts = row.get('timestamp')

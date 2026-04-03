@@ -65,7 +65,7 @@
             <div class="filter-buttons">
                 <button class="btn" id="applyFilters">🔍 Применить</button>
                 <button class="btn btn-outline" id="resetFilters">↺ Сбросить</button>
-                <button class="btn btn-outline" id="sendTelegramBtn">📨 Отправить сегодняшних в Сберчат</button>
+                <button class="btn btn-outline" id="sendTelegramBtn">📨 Отправить в Сберчат</button>
                 <button class="btn btn-outline" id="processPendingBtn">🔄 Обновить из базы</button>
             </div>
         </div>
@@ -207,7 +207,7 @@
             const result = await resp.json();
             alert(result.status === 'ok' ? `Отчёты отправлены в ${result.sent} чатов` : 'Ошибка: ' + (result.message || 'неизвестная ошибка'));
         } catch (err) { alert('Ошибка соединения: ' + err.message); }
-        finally { btn.disabled = false; btn.textContent = '📨 Отправить сегодняшних в Сберчат'; }
+        finally { btn.disabled = false; btn.textContent = '📨 Отправить в Сберчат'; }
     });
 
     // Новая кнопка: обработка непроцессированных записей

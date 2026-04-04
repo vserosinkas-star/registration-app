@@ -216,8 +216,9 @@
                 <button class="btn" id="applyFilters">🔍 Применить</button>
                 <button class="btn btn-outline" id="resetFilters">↺ Сбросить</button>
                 <button class="btn btn-outline" id="refreshBtn">🔄 Обновить из базы</button>
-                <button class="btn btn-outline" id="sendTelegramBtn">📨 Отправить в СберЧат</button>
+                <button class="btn btn-outline" id="sendTelegramBtn">📨 Отправить сегодняшних в Telegram</button>
                 <button class="btn btn-outline" id="exportExcelBtn">📊 Выгрузить в Excel</button>
+                <button class="btn btn-outline" id="remindKicBtn">📧 Напомнить руководителям КИЦ</button>
             </div>
         </div>
     </div>
@@ -225,7 +226,7 @@
     <!-- Блок статистики -->
     <div id="statisticsCard" class="filters-card" style="display: none; margin-bottom: 1rem; padding: 1rem;">
         <div style="font-size: 1.2rem; font-weight: 600;">
-            📊 Статистика: <span id="statText">Обучено X из Y сотрудников (Z%)</span>
+            📊 Статистика: <span id="statText">Зарегистрировано X из Y сотрудников (Z%)</span>
         </div>
     </div>
 
@@ -336,7 +337,7 @@
             const stats = await resp.json();
             const statCard = document.getElementById('statisticsCard');
             if (stats.total_employees > 0) {
-                document.getElementById('statText').innerHTML = `Обучено <strong>${stats.registered_unique}</strong> из <strong>${stats.total_employees}</strong> сотрудников (<strong>${stats.percentage}%</strong>)`;
+                document.getElementById('statText').innerHTML = `Зарегистрировано <strong>${stats.registered_unique}</strong> из <strong>${stats.total_employees}</strong> сотрудников (<strong>${stats.percentage}%</strong>)`;
                 statCard.style.display = 'block';
             } else {
                 document.getElementById('statText').innerHTML = `⚠️ Нет данных о сотрудниках для выбранного подразделения.`;
@@ -438,13 +439,11 @@
         loadStatistics();
     }
 
-    // Кнопка "Обновить из базы" – перезагружает данные без сброса фильтров
     document.getElementById('refreshBtn').addEventListener('click', () => {
         loadTableData();
         loadStatistics();
     });
 
-    // Кнопка отправки отчётов в СберЧат
     document.getElementById('sendTelegramBtn').addEventListener('click', async function() {
         const btn = this;
         btn.disabled = true;
@@ -464,11 +463,10 @@
             alert('Ошибка соединения: ' + err.message);
         } finally {
             btn.disabled = false;
-            btn.textContent = '📨 Отправить в СберЧат';
+            btn.textContent = '📨 Отправить сегодняшних в Telegram';
         }
     });
 
-    // Кнопка выгрузки в Excel
     document.getElementById('exportExcelBtn').addEventListener('click', async function() {
         const filteredData = table.rows({ search: 'applied' }).data().toArray();
         if (filteredData.length === 0) {
@@ -503,6 +501,37 @@
         } finally {
             btn.disabled = false;
             btn.textContent = '📊 Выгрузить в Excel';
+        }
+    });
+
+    document.getElementById('remindKicBtn').addEventListener('click', async function() {
+        const days = 30;
+        const purpose = '';
+        const btn = this;
+        btn.disabled = true;
+        btn.textContent = '⏳ Отправка...';
+        try {
+            const resp = await fetch('/api/send-kic-reminders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ days, purpose })
+            });
+            const result = await resp.json();
+            if (result.status === 'ok') {
+                let msg = 'Напоминания отправлены:\n';
+                result.results.forEach(r => {
+                    if (r.error) msg += `${r.kic}: ${r.error}\n`;
+                    else msg += `${r.kic}: ${r.sent} сотрудников -> ${r.to}\n`;
+                });
+                alert(msg);
+            } else {
+                alert('Ошибка: ' + (result.message || 'неизвестная ошибка'));
+            }
+        } catch (err) {
+            alert('Ошибка соединения: ' + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '📧 Напомнить руководителям КИЦ';
         }
     });
 

@@ -15,14 +15,11 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from collections import defaultdict
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 
-# ========== СОЗДАНИЕ ПРИЛОЖЕНИЯ ==========
 app = Flask(__name__, template_folder='../templates')
 CORS(app)
 
-# ========== ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ ==========
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -34,7 +31,6 @@ SMTP_USER = os.environ.get("SMTP_USER")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
 SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER)
 
-# ========== ИНИЦИАЛИЗАЦИЯ SUPABASE ==========
 if not SUPABASE_URL or not SUPABASE_KEY:
     logging.error("Missing SUPABASE_URL or SUPABASE_KEY")
     supabase = None
@@ -49,7 +45,6 @@ else:
 if not TELEGRAM_BOT_TOKEN:
     logging.warning("TELEGRAM_BOT_TOKEN not set")
 
-# Часовой пояс Екатеринбурга
 YEKAT_TIMEZONE = pytz.timezone('Asia/Yekaterinburg')
 
 # ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
@@ -387,9 +382,9 @@ def search_employees():
         return jsonify([])
     try:
         if query.isdigit():
-            res = supabase.table('employees').select('id, fio, tab_number, kic_pi, email').eq('tab_number', query).limit(limit).execute()
+            res = supabase.table('employees').select('id, fio, tab_number, kic_pi').eq('tab_number', query).limit(limit).execute()
         else:
-            res = supabase.table('employees').select('id, fio, tab_number, kic_pi, email').ilike('fio', f'%{query}%').limit(limit).execute()
+            res = supabase.table('employees').select('id, fio, tab_number, kic_pi').ilike('fio', f'%{query}%').limit(limit).execute()
         return jsonify(res.data)
     except Exception as e:
         logging.error(f"Ошибка поиска сотрудников: {e}")
@@ -465,6 +460,7 @@ def get_statistics():
         "percentage": round(percentage, 1)
     })
 
+# ========== ОТПРАВКА НАПОМИНАНИЙ РУКОВОДИТЕЛЯМ КИЦ ==========
 @app.route('/api/send-kic-reminders', methods=['POST'])
 def send_kic_reminders():
     if not supabase:
@@ -472,8 +468,8 @@ def send_kic_reminders():
     data = request.get_json() or {}
     days = data.get('days', 30)
     purpose = data.get('purpose')
-    # Сотрудники
-    emp_res = supabase.table('employees').select('id, fio, tab_number, email, kic_pi, gosb_name').execute()
+    # Получаем всех сотрудников (без поля email)
+    emp_res = supabase.table('employees').select('id, fio, tab_number, kic_pi, gosb_name').execute()
     employees = emp_res.data
     if not employees:
         return jsonify({"message": "Нет сотрудников"}), 200
@@ -493,7 +489,7 @@ def send_kic_reminders():
             registered_ids.add(reg['tab_number'])
         else:
             registered_ids.add(reg['fio'].strip().lower())
-    # Группировка по КИЦ
+    # Группируем по КИЦ
     missing_by_kic = defaultdict(list)
     for emp in employees:
         emp_id = emp.get('id')
@@ -529,6 +525,7 @@ def send_kic_reminders():
             results.append({"kic": kic, "error": "Ошибка отправки email"})
     return jsonify({"status": "ok", "results": results})
 
+# ========== ОСТАЛЬНЫЕ МАРШРУТЫ (экспорт Excel, Telegram, и т.д.) ==========
 @app.route('/api/export-excel', methods=['POST'])
 def export_excel():
     data = request.get_json()

@@ -27,12 +27,12 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID")
 
-# SMTP настройки (Gmail)
-SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+# SMTP настройки
+SMTP_HOST = os.environ.get("SMTP_HOST")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", 465))
-SMTP_USER = os.environ.get("SMTP_USER", "vserosinkas@gmail.com")
-SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")  # пароль приложения Gmail
-SMTP_FROM = os.environ.get("SMTP_FROM", "vserosinkas@gmail.com")
+SMTP_USER = os.environ.get("SMTP_USER")
+SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
+SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER)
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     logging.error("Missing SUPABASE_URL or SUPABASE_KEY environment variables")
@@ -200,15 +200,15 @@ def send_telegram_to_gosb(gosb, message):
     if gosb.get('copy_chat_id'):
         send_telegram_message(gosb['copy_chat_id'], message)
 
-# ========== ОТПРАВКА EMAIL ЧЕРЕЗ GMAIL ==========
+# ========== ОТПРАВКА EMAIL ==========
 def send_email(recipient, subject, body, cc=None):
-    """Отправляет email через SMTP Gmail. recipient и cc могут быть строками или списками."""
-    if not SMTP_PASSWORD:
-        logging.error("SMTP_PASSWORD не задан. Письмо не отправлено.")
+    """Отправляет email через SMTP. recipient и cc могут быть строками или списками."""
+    if not SMTP_HOST or not SMTP_USER or not SMTP_PASSWORD:
+        logging.error("SMTP не настроен. Письмо не отправлено.")
         return False
     try:
         msg = MIMEMultipart()
-        msg['From'] = SMTP_FROM
+        msg['From'] = SMTP_FROM  # формат "Имя <email>"
         msg['To'] = recipient if isinstance(recipient, str) else ', '.join(recipient)
         if cc:
             msg['Cc'] = cc if isinstance(cc, str) else ', '.join(cc)
@@ -483,21 +483,20 @@ def get_statistics():
     })
 
 # ========== НАПОМИНАНИЯ РУКОВОДИТЕЛЯМ КИЦ ==========
-@app.route('/api/send-kic-reminders', methods=['POST'])
-def send_kic_reminders():
-    """Отправляет email руководителям КИЦ (и копию ответственному) со списком незарегистрированных сотрудников."""
+@app.route('/api/missing-employees-by-kic')
+def missing_employees_by_kic():
+    """Возвращает список незарегистрированных сотрудников, сгруппированных по КИЦ, с email руководителей"""
     if not supabase:
         return jsonify({"error": "База данных не инициализирована"}), 500
-    data = request.get_json() or {}
-    days = data.get('days', 30)
-    purpose = data.get('purpose')
-    # Получаем всех сотрудников
+    days = int(request.args.get('days', 30))
+    purpose = request.args.get('purpose')
+    # Сотрудники с полными данными
     emp_query = supabase.table('employees').select('id, fio, tab_number, email, kic_pi, gosb_name')
     emp_res = emp_query.execute()
     employees = emp_res.data
     if not employees:
-        return jsonify({"message": "Нет сотрудников"}), 200
-    # Получаем зарегистрированных за период
+        return jsonify([])
+    # Зарегистрированные за период
     reg_query = supabase.table('registrations').select('employee_id, fio, tab_number, purpose')
     if days > 0:
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
@@ -513,7 +512,71 @@ def send_kic_reminders():
             registered_ids.add(reg['tab_number'])
         else:
             registered_ids.add(reg['fio'].strip().lower())
-    # Группируем незарегистрированных по КИЦ
+    # Группируем по КИЦ
+    missing_by_kic = defaultdict(list)
+    for emp in employees:
+        emp_id = emp.get('id')
+        emp_tab = emp.get('tab_number')
+        emp_fio = emp.get('fio', '').strip().lower()
+        if emp_id and emp_id in registered_ids:
+            continue
+        if emp_tab and emp_tab in registered_ids:
+            continue
+        if emp_fio and emp_fio in registered_ids:
+            continue
+        kic = emp.get('kic_pi') or 'Без КИЦ'
+        missing_by_kic[kic].append(emp)
+    # Получаем email руководителей для каждого КИЦ (из таблицы cities)
+    result = []
+    for kic, employees_list in missing_by_kic.items():
+        # Находим city_id по названию (ищем частичное совпадение)
+        city_res = supabase.table('cities').select('id, name, manager_email, responsible_email').ilike('name', f'%{kic}%').limit(1).execute()
+        manager_email = None
+        responsible_email = None
+        if city_res.data:
+            manager_email = city_res.data[0].get('manager_email')
+            responsible_email = city_res.data[0].get('responsible_email')
+        result.append({
+            "kic": kic,
+            "missing_count": len(employees_list),
+            "employees": [{"fio": e['fio'], "tab_number": e.get('tab_number'), "email": e.get('email')} for e in employees_list],
+            "manager_email": manager_email,
+            "responsible_email": responsible_email
+        })
+    return jsonify(result)
+
+@app.route('/api/send-kic-reminders', methods=['POST'])
+def send_kic_reminders():
+    """
+    Отправляет email руководителям КИЦ (и копию ответственному) со списком незарегистрированных сотрудников.
+    Ожидает JSON: { "days": 30, "purpose": "Модуль 2" } (оба опционально)
+    """
+    if not supabase:
+        return jsonify({"error": "База данных не инициализирована"}), 500
+    data = request.get_json() or {}
+    days = data.get('days', 30)
+    purpose = data.get('purpose')
+    # Получаем группировку
+    emp_query = supabase.table('employees').select('id, fio, tab_number, email, kic_pi, gosb_name')
+    emp_res = emp_query.execute()
+    employees = emp_res.data
+    if not employees:
+        return jsonify({"message": "Нет сотрудников"}), 200
+    reg_query = supabase.table('registrations').select('employee_id, fio, tab_number, purpose')
+    if days > 0:
+        cutoff = (datetime.now() - timedelta(days=days)).isoformat()
+        reg_query = reg_query.gte('timestamp', cutoff)
+    if purpose:
+        reg_query = reg_query.eq('purpose', purpose)
+    reg_res = reg_query.execute()
+    registered_ids = set()
+    for reg in reg_res.data:
+        if reg.get('employee_id'):
+            registered_ids.add(reg['employee_id'])
+        elif reg.get('tab_number'):
+            registered_ids.add(reg['tab_number'])
+        else:
+            registered_ids.add(reg['fio'].strip().lower())
     missing_by_kic = defaultdict(list)
     for emp in employees:
         emp_id = emp.get('id')
@@ -529,7 +592,7 @@ def send_kic_reminders():
         missing_by_kic[kic].append(emp)
     results = []
     for kic, emp_list in missing_by_kic.items():
-        # Находим email руководителя КИЦ в таблице cities (по частичному совпадению названия)
+        # Найти email руководителя КИЦ
         city_res = supabase.table('cities').select('manager_email, responsible_email').ilike('name', f'%{kic}%').limit(1).execute()
         manager_email = None
         responsible_email = None
@@ -539,6 +602,7 @@ def send_kic_reminders():
         if not manager_email:
             results.append({"kic": kic, "error": "Нет email руководителя"})
             continue
+        # Формируем письмо
         subject = f"Напоминание: {len(emp_list)} сотрудников не зарегистрировались на обучение ({kic})"
         body = f"Здравствуйте!\n\nСледующие сотрудники КИЦ «{kic}» не зарегистрировались на обучение за последние {days} дней:\n\n"
         for emp in emp_list:

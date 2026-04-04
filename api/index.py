@@ -7,12 +7,23 @@ from datetime import datetime, date, timedelta
 import pytz
 import requests
 import io
-import openpyxl
-from openpyxl.styles import Font, Alignment
-from openpyxl.utils import get_column_letter
+import traceback
+
+# Импортируем openpyxl с обработкой ошибки
+try:
+    import openpyxl
+    from openpyxl.styles import Font, Alignment
+    from openpyxl.utils import get_column_letter
+    OPENPYXL_AVAILABLE = True
+except ImportError:
+    OPENPYXL_AVAILABLE = False
+    logging.warning("openpyxl not installed. Excel export disabled.")
+
+# SMTP (встроен в Python)
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+
 from collections import defaultdict
 
 # Настройка логирования
@@ -29,22 +40,27 @@ ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID")
 
 # SMTP настройки
 SMTP_HOST = os.environ.get("SMTP_HOST")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", 465))
+SMTP_PORT = int(os.environ.get("SMTP_PORT", 465)) if os.environ.get("SMTP_PORT") else 465
 SMTP_USER = os.environ.get("SMTP_USER")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
 SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER)
 
+# Инициализация Supabase
 if not SUPABASE_URL or not SUPABASE_KEY:
     logging.error("Missing SUPABASE_URL or SUPABASE_KEY environment variables")
     supabase = None
 else:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    logging.info("Supabase client initialized")
+    try:
+        supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        logging.info("Supabase client initialized")
+    except Exception as e:
+        logging.error(f"Supabase init error: {e}")
+        supabase = None
 
 if not TELEGRAM_BOT_TOKEN:
     logging.warning("TELEGRAM_BOT_TOKEN not set. Telegram messages will not be sent.")
 
-# Часовой пояс Екатеринбурга (UTC+5)
+# Часовой пояс Екатеринбурга
 YEKAT_TIMEZONE = pytz.timezone('Asia/Yekaterinburg')
 
 # ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
@@ -115,6 +131,7 @@ def fill_report_record(reg_id, reg_data, gosb_name):
     if not supabase:
         return
     purpose = reg_data['purpose']
+    # Проверяем, не дублируется ли
     existing = supabase.table('report').select('id').eq('registration_id', reg_id).execute()
     if existing.data:
         logging.info(f"Запись для registration_id={reg_id} уже существует, пропускаем.")
@@ -202,13 +219,12 @@ def send_telegram_to_gosb(gosb, message):
 
 # ========== ОТПРАВКА EMAIL ==========
 def send_email(recipient, subject, body, cc=None):
-    """Отправляет email через SMTP. recipient и cc могут быть строками или списками."""
     if not SMTP_HOST or not SMTP_USER or not SMTP_PASSWORD:
         logging.error("SMTP не настроен. Письмо не отправлено.")
         return False
     try:
         msg = MIMEMultipart()
-        msg['From'] = SMTP_FROM  # формат "Имя <email>"
+        msg['From'] = SMTP_FROM
         msg['To'] = recipient if isinstance(recipient, str) else ', '.join(recipient)
         if cc:
             msg['Cc'] = cc if isinstance(cc, str) else ', '.join(cc)
@@ -231,6 +247,8 @@ def send_email(recipient, subject, body, cc=None):
 
 # ========== ЭКСПОРТ В EXCEL ==========
 def create_excel_from_data(data_rows):
+    if not OPENPYXL_AVAILABLE:
+        raise Exception("openpyxl not installed")
     wb = openpyxl.Workbook()
     ws = wb.active
     headers = [
@@ -398,6 +416,8 @@ def get_report_data():
 
 @app.route('/api/employees/search')
 def search_employees():
+    if not supabase:
+        return jsonify([])
     query = request.args.get('q', '').strip()
     limit = int(request.args.get('limit', 10))
     if not query:
@@ -483,20 +503,19 @@ def get_statistics():
     })
 
 # ========== НАПОМИНАНИЯ РУКОВОДИТЕЛЯМ КИЦ ==========
-@app.route('/api/missing-employees-by-kic')
-def missing_employees_by_kic():
-    """Возвращает список незарегистрированных сотрудников, сгруппированных по КИЦ, с email руководителей"""
+@app.route('/api/send-kic-reminders', methods=['POST'])
+def send_kic_reminders():
     if not supabase:
         return jsonify({"error": "База данных не инициализирована"}), 500
-    days = int(request.args.get('days', 30))
-    purpose = request.args.get('purpose')
-    # Сотрудники с полными данными
-    emp_query = supabase.table('employees').select('id, fio, tab_number, email, kic_pi, gosb_name')
-    emp_res = emp_query.execute()
+    data = request.get_json() or {}
+    days = data.get('days', 30)
+    purpose = data.get('purpose')
+    # Получаем всех сотрудников
+    emp_res = supabase.table('employees').select('id, fio, tab_number, email, kic_pi, gosb_name').execute()
     employees = emp_res.data
     if not employees:
-        return jsonify([])
-    # Зарегистрированные за период
+        return jsonify({"message": "Нет сотрудников"}), 200
+    # Регистрации за период
     reg_query = supabase.table('registrations').select('employee_id, fio, tab_number, purpose')
     if days > 0:
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
@@ -526,70 +545,6 @@ def missing_employees_by_kic():
             continue
         kic = emp.get('kic_pi') or 'Без КИЦ'
         missing_by_kic[kic].append(emp)
-    # Получаем email руководителей для каждого КИЦ (из таблицы cities)
-    result = []
-    for kic, employees_list in missing_by_kic.items():
-        # Находим city_id по названию (ищем частичное совпадение)
-        city_res = supabase.table('cities').select('id, name, manager_email, responsible_email').ilike('name', f'%{kic}%').limit(1).execute()
-        manager_email = None
-        responsible_email = None
-        if city_res.data:
-            manager_email = city_res.data[0].get('manager_email')
-            responsible_email = city_res.data[0].get('responsible_email')
-        result.append({
-            "kic": kic,
-            "missing_count": len(employees_list),
-            "employees": [{"fio": e['fio'], "tab_number": e.get('tab_number'), "email": e.get('email')} for e in employees_list],
-            "manager_email": manager_email,
-            "responsible_email": responsible_email
-        })
-    return jsonify(result)
-
-@app.route('/api/send-kic-reminders', methods=['POST'])
-def send_kic_reminders():
-    """
-    Отправляет email руководителям КИЦ (и копию ответственному) со списком незарегистрированных сотрудников.
-    Ожидает JSON: { "days": 30, "purpose": "Модуль 2" } (оба опционально)
-    """
-    if not supabase:
-        return jsonify({"error": "База данных не инициализирована"}), 500
-    data = request.get_json() or {}
-    days = data.get('days', 30)
-    purpose = data.get('purpose')
-    # Получаем группировку
-    emp_query = supabase.table('employees').select('id, fio, tab_number, email, kic_pi, gosb_name')
-    emp_res = emp_query.execute()
-    employees = emp_res.data
-    if not employees:
-        return jsonify({"message": "Нет сотрудников"}), 200
-    reg_query = supabase.table('registrations').select('employee_id, fio, tab_number, purpose')
-    if days > 0:
-        cutoff = (datetime.now() - timedelta(days=days)).isoformat()
-        reg_query = reg_query.gte('timestamp', cutoff)
-    if purpose:
-        reg_query = reg_query.eq('purpose', purpose)
-    reg_res = reg_query.execute()
-    registered_ids = set()
-    for reg in reg_res.data:
-        if reg.get('employee_id'):
-            registered_ids.add(reg['employee_id'])
-        elif reg.get('tab_number'):
-            registered_ids.add(reg['tab_number'])
-        else:
-            registered_ids.add(reg['fio'].strip().lower())
-    missing_by_kic = defaultdict(list)
-    for emp in employees:
-        emp_id = emp.get('id')
-        emp_tab = emp.get('tab_number')
-        emp_fio = emp.get('fio', '').strip().lower()
-        if emp_id and emp_id in registered_ids:
-            continue
-        if emp_tab and emp_tab in registered_ids:
-            continue
-        if emp_fio and emp_fio in registered_ids:
-            continue
-        kic = emp.get('kic_pi') or 'Без КИЦ'
-        missing_by_kic[kic].append(emp)
     results = []
     for kic, emp_list in missing_by_kic.items():
         # Найти email руководителя КИЦ
@@ -602,7 +557,6 @@ def send_kic_reminders():
         if not manager_email:
             results.append({"kic": kic, "error": "Нет email руководителя"})
             continue
-        # Формируем письмо
         subject = f"Напоминание: {len(emp_list)} сотрудников не зарегистрировались на обучение ({kic})"
         body = f"Здравствуйте!\n\nСледующие сотрудники КИЦ «{kic}» не зарегистрировались на обучение за последние {days} дней:\n\n"
         for emp in emp_list:
@@ -616,47 +570,23 @@ def send_kic_reminders():
 
 @app.route('/api/export-excel', methods=['POST'])
 def export_excel():
+    if not OPENPYXL_AVAILABLE:
+        return jsonify({"error": "Excel export not available (openpyxl missing)"}), 500
     data = request.get_json()
     rows = data.get('data', [])
     if not rows:
         return jsonify({"error": "Нет данных для экспорта"}), 400
-    excel_file = create_excel_from_data(rows)
-    return send_file(
-        excel_file,
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        as_attachment=True,
-        download_name=f'report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
-    )
-
-# ========== ОТПРАВКА В TELEGRAM ==========
-@app.route('/api/send-daily-reports', methods=['GET'])
-def send_daily_reports():
-    if not supabase:
-        return jsonify({"error": "База данных не инициализирована"}), 500
-    gosb_res = supabase.table('gosb').select('id, name, slug, chat_id, copy_chat_id').not_.is_('chat_id', 'null').execute()
-    if not gosb_res.data:
-        return jsonify({"message": "Нет получателей"}), 200
-    yesterday = date.today() - timedelta(days=1)
-    yesterday_str = yesterday.strftime('%Y-%m-%d')
-    report_res = supabase.table('report').select('*').gte('timestamp', yesterday_str).lte('timestamp', yesterday_str + ' 23:59:59').execute()
-    registrations = report_res.data
-    by_gosb = {}
-    for reg in registrations:
-        gosb_name = reg.get('gosb_name')
-        if gosb_name not in by_gosb:
-            by_gosb[gosb_name] = []
-        by_gosb[gosb_name].append(reg)
-    sent_count = 0
-    for gosb in gosb_res.data:
-        regs = by_gosb.get(gosb['name'], [])
-        if not regs:
-            continue
-        message = format_report_message(regs)
-        if message:
-            full_message = f"🏢 {gosb['name']} — регистрация на {yesterday.strftime('%d.%m.%Y')}\n\n{message}"
-            send_telegram_to_gosb(gosb, full_message)
-            sent_count += 1
-    return jsonify({"status": "ok", "sent": sent_count}), 200
+    try:
+        excel_file = create_excel_from_data(rows)
+        return send_file(
+            excel_file,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        )
+    except Exception as e:
+        logging.error(f"Export error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/send-today-reports', methods=['POST'])
 def send_today_reports():
@@ -687,13 +617,41 @@ def send_today_reports():
             sent_count += 1
     return jsonify({"status": "ok", "sent": sent_count}), 200
 
+@app.route('/api/send-daily-reports', methods=['GET'])
+def send_daily_reports():
+    if not supabase:
+        return jsonify({"error": "База данных не инициализирована"}), 500
+    gosb_res = supabase.table('gosb').select('id, name, slug, chat_id, copy_chat_id').not_.is_('chat_id', 'null').execute()
+    if not gosb_res.data:
+        return jsonify({"message": "Нет получателей"}), 200
+    yesterday = date.today() - timedelta(days=1)
+    yesterday_str = yesterday.strftime('%Y-%m-%d')
+    report_res = supabase.table('report').select('*').gte('timestamp', yesterday_str).lte('timestamp', yesterday_str + ' 23:59:59').execute()
+    registrations = report_res.data
+    by_gosb = {}
+    for reg in registrations:
+        gosb_name = reg.get('gosb_name')
+        if gosb_name not in by_gosb:
+            by_gosb[gosb_name] = []
+        by_gosb[gosb_name].append(reg)
+    sent_count = 0
+    for gosb in gosb_res.data:
+        regs = by_gosb.get(gosb['name'], [])
+        if not regs:
+            continue
+        message = format_report_message(regs)
+        if message:
+            full_message = f"🏢 {gosb['name']} — регистрация на {yesterday.strftime('%d.%m.%Y')}\n\n{message}"
+            send_telegram_to_gosb(gosb, full_message)
+            sent_count += 1
+    return jsonify({"status": "ok", "sent": sent_count}), 200
+
 @app.route('/api/cron-remind', methods=['GET'])
 def cron_remind():
     """Еженедельное напоминание (вызывается по Cron)"""
     with app.test_request_context(json={'days': 30}):
         return send_kic_reminders()
 
-# ========== ОТЛАДОЧНЫЙ МАРШРУТ ==========
 @app.route('/api/debug-supabase')
 def debug_supabase():
     if not supabase:

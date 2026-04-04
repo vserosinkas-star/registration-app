@@ -34,7 +34,7 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID")
 
 SMTP_HOST = os.environ.get("SMTP_HOST")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", 465)) if os.environ.get("SMTP_PORT") else 465
+SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))  # по умолчанию 587
 SMTP_USER = os.environ.get("SMTP_USER")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
 SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER)
@@ -192,11 +192,22 @@ def send_telegram_to_gosb(gosb, message):
     if gosb.get('copy_chat_id'):
         send_telegram_message(gosb['copy_chat_id'], message)
 
+# ========== ОТПРАВКА EMAIL (универсальная, с портами 465/587) ==========
 def send_email(recipient, subject, body, cc=None):
     if not SMTP_HOST or not SMTP_USER or not SMTP_PASSWORD:
-        logging.error("SMTP не настроен")
+        logging.error("SMTP не настроен: missing host/user/password")
         return False
     try:
+        if SMTP_PORT == 587:
+            server = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
+            server.starttls()
+        else:
+            server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT)
+        # Включить отладку (раскомментировать для диагностики)
+        # server.set_debuglevel(1)
+        server.login(SMTP_USER, SMTP_PASSWORD)
+        logging.info(f"SMTP login successful, sending to {recipient}")
+
         msg = MIMEMultipart()
         msg['From'] = SMTP_FROM
         msg['To'] = recipient if isinstance(recipient, str) else ', '.join(recipient)
@@ -204,16 +215,17 @@ def send_email(recipient, subject, body, cc=None):
             msg['Cc'] = cc if isinstance(cc, str) else ', '.join(cc)
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain', 'utf-8'))
+
         all_recipients = [recipient] if isinstance(recipient, str) else recipient.copy()
         if cc:
             all_recipients.extend([cc] if isinstance(cc, str) else cc)
-        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.send_message(msg, to_addrs=all_recipients)
-        logging.info(f"Email отправлен на {recipient}")
+
+        server.send_message(msg, to_addrs=all_recipients)
+        server.quit()
+        logging.info(f"Email successfully sent to {recipient}")
         return True
     except Exception as e:
-        logging.error(f"Ошибка отправки email: {e}")
+        logging.error(f"SMTP error: {e}")
         return False
 
 # ========== ЭКСПОРТ В EXCEL ==========
@@ -523,17 +535,25 @@ def send_kic_reminders():
             responsible_email = city_res.data[0].get('responsible_email')
         if not manager_email:
             results.append({"kic": kic, "error": "Нет email руководителя"})
+            logging.warning(f"Для КИЦ {kic} не указан manager_email")
             continue
         subject = f"Напоминание: {len(emp_list)} сотрудников не зарегистрировались на обучение ({kic})"
         body = f"Здравствуйте!\n\nСледующие сотрудники КИЦ «{kic}» не зарегистрировались на обучение за последние {days} дней:\n\n"
         for emp in emp_list:
             body += f"• {emp['fio']} (таб. {emp.get('tab_number', 'нет')})\n"
         body += "\nПожалуйста, организуйте их регистрацию в системе."
+        logging.info(f"Отправка email для {kic}: {manager_email}")
         if send_email(manager_email, subject, body, cc=responsible_email):
             results.append({"kic": kic, "sent": len(emp_list), "to": manager_email, "cc": responsible_email})
         else:
             results.append({"kic": kic, "error": "Ошибка отправки email"})
     return jsonify({"status": "ok", "results": results})
+
+# ========== ТЕСТОВЫЙ МАРШРУТ ДЛЯ ПРОВЕРКИ SMTP ==========
+@app.route('/api/test-email')
+def test_email():
+    result = send_email('vserosinkas@gmail.com', 'Тест SMTP', 'Если вы видите это письмо, SMTP работает правильно.')
+    return jsonify({"status": "ok" if result else "error", "result": result})
 
 # ========== ЭКСПОРТ В EXCEL ==========
 @app.route('/api/export-excel', methods=['POST'])
@@ -556,6 +576,7 @@ def export_excel():
         logging.error(f"Export error: {e}")
         return jsonify({"error": str(e)}), 500
 
+# ========== ОТПРАВКА В TELEGRAM ==========
 @app.route('/api/send-daily-reports', methods=['GET'])
 def send_daily_reports():
     if not supabase:

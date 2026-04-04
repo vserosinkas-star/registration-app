@@ -7,19 +7,27 @@ from datetime import datetime, date, timedelta
 import pytz
 import requests
 import io
-import openpyxl
-from openpyxl.styles import Font, Alignment
-from openpyxl.utils import get_column_letter
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from collections import defaultdict
+
+# Импорт openpyxl с защитой
+try:
+    import openpyxl
+    from openpyxl.styles import Font, Alignment
+    from openpyxl.utils import get_column_letter
+    OPENPYXL_AVAILABLE = True
+except ImportError:
+    OPENPYXL_AVAILABLE = False
+    logging.warning("openpyxl not installed. Excel export disabled.")
 
 logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__, template_folder='../templates')
 CORS(app)
 
+# Переменные окружения
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -31,6 +39,7 @@ SMTP_USER = os.environ.get("SMTP_USER")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
 SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER)
 
+# Supabase
 if not SUPABASE_URL or not SUPABASE_KEY:
     logging.error("Missing SUPABASE_URL or SUPABASE_KEY")
     supabase = None
@@ -207,7 +216,10 @@ def send_email(recipient, subject, body, cc=None):
         logging.error(f"Ошибка отправки email: {e}")
         return False
 
+# ========== ЭКСПОРТ В EXCEL ==========
 def create_excel_from_data(data_rows):
+    if not OPENPYXL_AVAILABLE:
+        raise Exception("openpyxl not installed")
     wb = openpyxl.Workbook()
     ws = wb.active
     headers = [
@@ -460,7 +472,7 @@ def get_statistics():
         "percentage": round(percentage, 1)
     })
 
-# ========== ОТПРАВКА НАПОМИНАНИЙ РУКОВОДИТЕЛЯМ КИЦ ==========
+# ========== НАПОМИНАНИЯ РУКОВОДИТЕЛЯМ КИЦ ==========
 @app.route('/api/send-kic-reminders', methods=['POST'])
 def send_kic_reminders():
     if not supabase:
@@ -468,13 +480,13 @@ def send_kic_reminders():
     data = request.get_json() or {}
     days = data.get('days', 30)
     purpose = data.get('purpose')
-    # Получаем всех сотрудников (без поля email)
+    # Сотрудники
     emp_res = supabase.table('employees').select('id, fio, tab_number, kic_pi, gosb_name').execute()
     employees = emp_res.data
     if not employees:
         return jsonify({"message": "Нет сотрудников"}), 200
-    # Регистрации за период
-    reg_query = supabase.table('registrations').select('employee_id, fio, tab_number, purpose')
+    # Регистрации за период (выбираем employee_id и fio)
+    reg_query = supabase.table('registrations').select('employee_id, fio, purpose')
     if days > 0:
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
         reg_query = reg_query.gte('timestamp', cutoff)
@@ -485,11 +497,9 @@ def send_kic_reminders():
     for reg in reg_res.data:
         if reg.get('employee_id'):
             registered_ids.add(reg['employee_id'])
-        elif reg.get('tab_number'):
-            registered_ids.add(reg['tab_number'])
         else:
             registered_ids.add(reg['fio'].strip().lower())
-    # Группируем по КИЦ
+    # Группировка по КИЦ
     missing_by_kic = defaultdict(list)
     for emp in employees:
         emp_id = emp.get('id')
@@ -525,20 +535,26 @@ def send_kic_reminders():
             results.append({"kic": kic, "error": "Ошибка отправки email"})
     return jsonify({"status": "ok", "results": results})
 
-# ========== ОСТАЛЬНЫЕ МАРШРУТЫ (экспорт Excel, Telegram, и т.д.) ==========
+# ========== ЭКСПОРТ В EXCEL ==========
 @app.route('/api/export-excel', methods=['POST'])
 def export_excel():
+    if not OPENPYXL_AVAILABLE:
+        return jsonify({"error": "Excel export not available (openpyxl missing)"}), 500
     data = request.get_json()
     rows = data.get('data', [])
     if not rows:
         return jsonify({"error": "Нет данных для экспорта"}), 400
-    excel_file = create_excel_from_data(rows)
-    return send_file(
-        excel_file,
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        as_attachment=True,
-        download_name=f'report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
-    )
+    try:
+        excel_file = create_excel_from_data(rows)
+        return send_file(
+            excel_file,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+        )
+    except Exception as e:
+        logging.error(f"Export error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/send-daily-reports', methods=['GET'])
 def send_daily_reports():

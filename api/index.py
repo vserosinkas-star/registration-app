@@ -34,7 +34,7 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID")
 
 SMTP_HOST = os.environ.get("SMTP_HOST")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))  # по умолчанию 587
+SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
 SMTP_USER = os.environ.get("SMTP_USER")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
 SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER)
@@ -192,7 +192,7 @@ def send_telegram_to_gosb(gosb, message):
     if gosb.get('copy_chat_id'):
         send_telegram_message(gosb['copy_chat_id'], message)
 
-# ========== ОТПРАВКА EMAIL (универсальная, с портами 465/587) ==========
+# ========== ОТПРАВКА EMAIL ==========
 def send_email(recipient, subject, body, cc=None):
     if not SMTP_HOST or not SMTP_USER or not SMTP_PASSWORD:
         logging.error("SMTP не настроен: missing host/user/password")
@@ -203,8 +203,6 @@ def send_email(recipient, subject, body, cc=None):
             server.starttls()
         else:
             server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT)
-        # Включить отладку (раскомментировать для диагностики)
-        # server.set_debuglevel(1)
         server.login(SMTP_USER, SMTP_PASSWORD)
         logging.info(f"SMTP login successful, sending to {recipient}")
 
@@ -484,7 +482,7 @@ def get_statistics():
         "percentage": round(percentage, 1)
     })
 
-# ========== НАПОМИНАНИЯ РУКОВОДИТЕЛЯМ КИЦ ==========
+# ========== НАПОМИНАНИЯ РУКОВОДИТЕЛЯМ КИЦ (исправленный поиск email) ==========
 @app.route('/api/send-kic-reminders', methods=['POST'])
 def send_kic_reminders():
     if not supabase:
@@ -497,7 +495,7 @@ def send_kic_reminders():
     employees = emp_res.data
     if not employees:
         return jsonify({"message": "Нет сотрудников"}), 200
-    # Регистрации за период (выбираем employee_id и fio)
+    # Регистрации за период
     reg_query = supabase.table('registrations').select('employee_id, fio, purpose')
     if days > 0:
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
@@ -525,31 +523,35 @@ def send_kic_reminders():
             continue
         kic = emp.get('kic_pi') or 'Без КИЦ'
         missing_by_kic[kic].append(emp)
+    # Получаем список всех городов с email (один раз)
+    cities_all = supabase.table('cities').select('name, manager_email, responsible_email').execute()
+    cities_list = cities_all.data
     results = []
     for kic, emp_list in missing_by_kic.items():
-        city_res = supabase.table('cities').select('manager_email, responsible_email').ilike('name', f'%{kic}%').limit(1).execute()
+        # Ищем email: название города из cities должно содержаться в строке kic (без учёта регистра)
         manager_email = None
         responsible_email = None
-        if city_res.data:
-            manager_email = city_res.data[0].get('manager_email')
-            responsible_email = city_res.data[0].get('responsible_email')
+        for city in cities_list:
+            if city['name'].lower() in kic.lower():
+                manager_email = city.get('manager_email')
+                responsible_email = city.get('responsible_email')
+                break
         if not manager_email:
-            results.append({"kic": kic, "error": "Нет email руководителя"})
-            logging.warning(f"Для КИЦ {kic} не указан manager_email")
+            # Не выводим в алерт, просто логируем
+            logging.info(f"Для КИЦ {kic} нет email руководителя")
             continue
         subject = f"Напоминание: {len(emp_list)} сотрудников не зарегистрировались на обучение ({kic})"
         body = f"Здравствуйте!\n\nСледующие сотрудники КИЦ «{kic}» не зарегистрировались на обучение за последние {days} дней:\n\n"
         for emp in emp_list:
             body += f"• {emp['fio']} (таб. {emp.get('tab_number', 'нет')})\n"
         body += "\nПожалуйста, организуйте их регистрацию в системе."
-        logging.info(f"Отправка email для {kic}: {manager_email}")
         if send_email(manager_email, subject, body, cc=responsible_email):
             results.append({"kic": kic, "sent": len(emp_list), "to": manager_email, "cc": responsible_email})
         else:
             results.append({"kic": kic, "error": "Ошибка отправки email"})
     return jsonify({"status": "ok", "results": results})
 
-# ========== ТЕСТОВЫЙ МАРШРУТ ДЛЯ ПРОВЕРКИ SMTP ==========
+# ========== ТЕСТОВЫЙ МАРШРУТ ==========
 @app.route('/api/test-email')
 def test_email():
     result = send_email('vserosinkas@gmail.com', 'Тест SMTP', 'Если вы видите это письмо, SMTP работает правильно.')

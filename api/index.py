@@ -27,19 +27,19 @@ logging.basicConfig(level=logging.INFO)
 app = Flask(__name__, template_folder='../templates')
 CORS(app)
 
-# Переменные окружения
+# ========== ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ ==========
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 ADMIN_CHAT_ID = os.environ.get("ADMIN_CHAT_ID")
 
 SMTP_HOST = os.environ.get("SMTP_HOST")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", 587))
+SMTP_PORT = int(os.environ.get("SMTP_PORT", 587)) if os.environ.get("SMTP_PORT") else 587
 SMTP_USER = os.environ.get("SMTP_USER")
 SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
 SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER)
 
-# Supabase
+# ========== SUPABASE ==========
 if not SUPABASE_URL or not SUPABASE_KEY:
     logging.error("Missing SUPABASE_URL or SUPABASE_KEY")
     supabase = None
@@ -149,6 +149,28 @@ def fill_report_record(reg_id, reg_data, gosb_name):
     except Exception as e:
         logging.error(f"fill_report_record error: {e}")
 
+def is_duplicate_registration(fio, purpose):
+    """Проверяет, регистрировался ли сотрудник на ту же цель в текущем квартале"""
+    if not supabase:
+        return False
+    try:
+        now = datetime.now()
+        year = now.year
+        quarter = (now.month - 1) // 3 + 1
+        start_date = datetime(year, (quarter-1)*3 + 1, 1)
+        end_date = datetime(year, quarter*3 + 1, 1) - timedelta(days=1)
+        res = supabase.table('registrations') \
+            .select('id') \
+            .eq('fio', fio) \
+            .eq('purpose', purpose) \
+            .gte('timestamp', start_date.isoformat()) \
+            .lte('timestamp', end_date.isoformat()) \
+            .execute()
+        return len(res.data) > 0
+    except Exception as e:
+        logging.error(f"Ошибка проверки дубликатов: {e}")
+        return False
+
 def send_telegram_message(chat_id, text):
     if not TELEGRAM_BOT_TOKEN:
         logging.error("TELEGRAM_BOT_TOKEN не задан")
@@ -192,10 +214,9 @@ def send_telegram_to_gosb(gosb, message):
     if gosb.get('copy_chat_id'):
         send_telegram_message(gosb['copy_chat_id'], message)
 
-# ========== ОТПРАВКА EMAIL ==========
 def send_email(recipient, subject, body, cc=None):
     if not SMTP_HOST or not SMTP_USER or not SMTP_PASSWORD:
-        logging.error("SMTP не настроен: missing host/user/password")
+        logging.error("SMTP не настроен")
         return False
     try:
         if SMTP_PORT == 587:
@@ -204,8 +225,6 @@ def send_email(recipient, subject, body, cc=None):
         else:
             server = smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT)
         server.login(SMTP_USER, SMTP_PASSWORD)
-        logging.info(f"SMTP login successful, sending to {recipient}")
-
         msg = MIMEMultipart()
         msg['From'] = SMTP_FROM
         msg['To'] = recipient if isinstance(recipient, str) else ', '.join(recipient)
@@ -213,20 +232,17 @@ def send_email(recipient, subject, body, cc=None):
             msg['Cc'] = cc if isinstance(cc, str) else ', '.join(cc)
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain', 'utf-8'))
-
         all_recipients = [recipient] if isinstance(recipient, str) else recipient.copy()
         if cc:
             all_recipients.extend([cc] if isinstance(cc, str) else cc)
-
         server.send_message(msg, to_addrs=all_recipients)
         server.quit()
-        logging.info(f"Email successfully sent to {recipient}")
+        logging.info(f"Email отправлен на {recipient}")
         return True
     except Exception as e:
         logging.error(f"SMTP error: {e}")
         return False
 
-# ========== ЭКСПОРТ В EXCEL ==========
 def create_excel_from_data(data_rows):
     if not OPENPYXL_AVAILABLE:
         raise Exception("openpyxl not installed")
@@ -284,10 +300,20 @@ def api_register():
     employee_id = data.get('employee_id')
     if not fio or not city_id or not purpose:
         return jsonify({'status': 'error', 'message': 'Не все поля заполнены'}), 400
+
+    # Проверка дубликата
+    if is_duplicate_registration(fio, purpose):
+        return jsonify({
+            'status': 'error',
+            'message': f'❌ {fio} уже зарегистрирован на "{purpose}" в этом квартале.'
+        }), 400
+
     gosb = get_gosb_by_slug(gosb_slug)
     if not gosb:
         return jsonify({'status': 'error', 'message': 'ГОСБ не найден'}), 400
+
     address = reverse_geocode(lat, lng) if lat and lng else 'Адрес не определён'
+
     reg_data = {
         'fio': fio,
         'city_id': city_id,
@@ -383,6 +409,7 @@ def get_report_data():
             if month and str(yekat_dt.month) != month:
                 continue
             filtered.append(row)
+        # дедупликация по registration_id
         unique = {}
         for row in filtered:
             rid = row.get('registration_id')
@@ -482,7 +509,7 @@ def get_statistics():
         "percentage": round(percentage, 1)
     })
 
-# ========== НАПОМИНАНИЯ РУКОВОДИТЕЛЯМ КИЦ (исправленный поиск email) ==========
+# ========== НАПОМИНАНИЯ РУКОВОДИТЕЛЯМ КИЦ (с фильтрацией) ==========
 @app.route('/api/send-kic-reminders', methods=['POST'])
 def send_kic_reminders():
     if not supabase:
@@ -490,12 +517,20 @@ def send_kic_reminders():
     data = request.get_json() or {}
     days = data.get('days', 30)
     purpose = data.get('purpose')
-    # Сотрудники
-    emp_res = supabase.table('employees').select('id, fio, tab_number, kic_pi, gosb_name').execute()
-    employees = emp_res.data
+    gosb = data.get('gosb')
+    city = data.get('city')
+
+    # 1. Сотрудники с фильтрацией
+    emp_query = supabase.table('employees').select('id, fio, tab_number, kic_pi, gosb_name')
+    if gosb:
+        emp_query = emp_query.eq('gosb_name', gosb)
+    if city:
+        emp_query = emp_query.ilike('kic_pi', f'%{city}%')
+    employees = emp_query.execute().data
     if not employees:
-        return jsonify({"message": "Нет сотрудников"}), 200
-    # Регистрации за период
+        return jsonify({"message": "Нет сотрудников для выбранных фильтров"}), 200
+
+    # 2. Регистрации за период
     reg_query = supabase.table('registrations').select('employee_id, fio, purpose')
     if days > 0:
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
@@ -509,7 +544,8 @@ def send_kic_reminders():
             registered_ids.add(reg['employee_id'])
         else:
             registered_ids.add(reg['fio'].strip().lower())
-    # Группировка по КИЦ
+
+    # 3. Отбираем незарегистрированных
     missing_by_kic = defaultdict(list)
     for emp in employees:
         emp_id = emp.get('id')
@@ -523,22 +559,24 @@ def send_kic_reminders():
             continue
         kic = emp.get('kic_pi') or 'Без КИЦ'
         missing_by_kic[kic].append(emp)
-    # Получаем список всех городов с email (один раз)
-    cities_all = supabase.table('cities').select('name, manager_email, responsible_email').execute()
-    cities_list = cities_all.data
+
+    # 4. Получаем все города для поиска email (один раз)
+    cities_all = supabase.table('cities').select('name, manager_email, responsible_email').execute().data
+
     results = []
     for kic, emp_list in missing_by_kic.items():
-        # Ищем email: название города из cities должно содержаться в строке kic (без учёта регистра)
+        # Если выбран конкретный город, но текущий kic не соответствует – пропускаем
+        if city and city.lower() not in kic.lower():
+            continue
         manager_email = None
         responsible_email = None
-        for city in cities_list:
-            if city['name'].lower() in kic.lower():
-                manager_email = city.get('manager_email')
-                responsible_email = city.get('responsible_email')
+        for c in cities_all:
+            if c['name'].lower() in kic.lower():
+                manager_email = c.get('manager_email')
+                responsible_email = c.get('responsible_email')
                 break
         if not manager_email:
-            # Не выводим в алерт, просто логируем
-            logging.info(f"Для КИЦ {kic} нет email руководителя")
+            results.append({"kic": kic, "error": "Нет email руководителя"})
             continue
         subject = f"Напоминание: {len(emp_list)} сотрудников не зарегистрировались на обучение ({kic})"
         body = f"Здравствуйте!\n\nСледующие сотрудники КИЦ «{kic}» не зарегистрировались на обучение за последние {days} дней:\n\n"
@@ -549,9 +587,12 @@ def send_kic_reminders():
             results.append({"kic": kic, "sent": len(emp_list), "to": manager_email, "cc": responsible_email})
         else:
             results.append({"kic": kic, "error": "Ошибка отправки email"})
+
+    if not results:
+        return jsonify({"message": "Нет подходящих КИЦ для отправки"}), 200
     return jsonify({"status": "ok", "results": results})
 
-# ========== ТЕСТОВЫЙ МАРШРУТ ==========
+# ========== ТЕСТОВЫЙ МАРШРУТ ДЛЯ SMTP ==========
 @app.route('/api/test-email')
 def test_email():
     result = send_email('vserosinkas@gmail.com', 'Тест SMTP', 'Если вы видите это письмо, SMTP работает правильно.')

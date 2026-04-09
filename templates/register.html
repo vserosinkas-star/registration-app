@@ -53,6 +53,7 @@
             border-color: #1a73e8;
             outline: none;
             box-shadow: 0 0 0 3px rgba(26,115,232,0.2);
+            background: #ffffff;
         }
         select {
             appearance: none;
@@ -72,7 +73,7 @@
             background: #1a73e8;
             color: white;
             border: none;
-            padding: 16px;
+            padding: 16px 20px;
             border-radius: 40px;
             font-size: 1rem;
             font-weight: 600;
@@ -80,7 +81,15 @@
             transition: all 0.2s;
             margin-top: 12px;
         }
-        .btn:disabled { background: #bdc1c6; cursor: not-allowed; }
+        .btn:not(:disabled):hover {
+            background: #1765d1;
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(26,115,232,0.25);
+        }
+        .btn:disabled {
+            background: #bdc1c6;
+            cursor: not-allowed;
+        }
         .spinner {
             display: inline-block;
             width: 18px;
@@ -93,14 +102,15 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         .status {
             margin-top: 24px;
-            padding: 16px;
+            padding: 16px 18px;
             border-radius: 24px;
-            display: none;
+            font-size: 0.9rem;
             text-align: center;
+            display: none;
         }
-        .status.success { background: #e6f4ea; color: #137333; }
-        .status.error { background: #fce8e6; color: #c5221f; }
-        .status.warning { background: #fff3e0; color: #b45f06; }
+        .status.success { background: #e6f4ea; color: #137333; border: 1px solid #b7e0c0; }
+        .status.error { background: #fce8e6; color: #c5221f; border: 1px solid #f5c2c0; }
+        .status.warning { background: #fff3e0; color: #b45f06; border: 1px solid #ffe6b3; }
         .footer {
             text-align: center;
             margin-top: 20px;
@@ -108,28 +118,28 @@
             color: #80868b;
             padding: 0 12px 18px;
         }
-        /* Стили для подсказок */
-        .suggestions {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
+        /* Стили для подсказок поиска сотрудника */
+        #employeeSuggestions {
             background: white;
             border: 1px solid #ccc;
             border-radius: 12px;
+            margin-top: 4px;
             max-height: 200px;
             overflow-y: auto;
+            position: absolute;
+            width: calc(100% - 36px);
             z-index: 1000;
-            display: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
-        .suggestions div {
-            padding: 10px 16px;
+        #employeeSuggestions div {
+            padding: 10px 12px;
             cursor: pointer;
             border-bottom: 1px solid #eee;
         }
-        .suggestions div:last-child { border-bottom: none; }
-        .suggestions div:hover { background: #e8f0fe; }
+        #employeeSuggestions div:last-child { border-bottom: none; }
+        #employeeSuggestions div:hover {
+            background: #e8f0fe;
+        }
     </style>
 </head>
 <body>
@@ -140,13 +150,21 @@
     </div>
     <div class="card-body">
         <form id="regForm">
+            <!-- Поле поиска сотрудника -->
             <div class="form-group">
-                <label for="fio">ФИО полностью *</label>
-                <input type="text" id="fio" placeholder="Начните вводить фамилию" autocomplete="off" required>
-                <div id="fioSuggestions" class="suggestions"></div>
-                <div class="hint">Например: Иванов Иван Иванович</div>
+                <label for="employeeSearch">🔍 Поиск сотрудника (ФИО / табельный номер)</label>
+                <input type="text" id="employeeSearch" placeholder="Начните вводить фамилию" autocomplete="off">
+                <div id="employeeSuggestions" style="display:none;"></div>
+                <input type="hidden" id="selectedEmployeeId">
             </div>
 
+            <!-- ФИО (заполняется автоматически при выборе сотрудника) -->
+            <div class="form-group">
+                <label for="fio">ФИО полностью *</label>
+                <input type="text" id="fio" placeholder="Иванов Иван Иванович" required>
+            </div>
+
+            <!-- КИЦ (город) – выпадающий список -->
             <div class="form-group">
                 <label for="kic">КИЦ (город) *</label>
                 <select id="kic" required>
@@ -155,6 +173,7 @@
                 <div class="hint">Выберите ваш КИЦ</div>
             </div>
 
+            <!-- Цель визита -->
             <div class="form-group">
                 <label for="purpose">Цель визита *</label>
                 <select id="purpose" required>
@@ -166,7 +185,9 @@
                 </select>
             </div>
 
-            <button type="submit" id="submitBtn" class="btn" disabled>Подготовка...</button>
+            <button type="submit" id="submitBtn" class="btn" disabled>
+                <span class="btn-text" id="btnText">Подготовка...</span>
+            </button>
         </form>
         <div id="status" class="status"></div>
     </div>
@@ -180,7 +201,8 @@
     let isLocationReady = false;
     let isKICLoaded = false;
     let locationError = false;
-    let citiesMap = {}; // { city_name: city_id }
+    let citiesMap = {}; // { cityName: cityId }
+    let citiesList = []; // для select
 
     // Геолокация
     function initGeolocation() {
@@ -207,7 +229,7 @@
         );
     }
 
-    // Загрузка списка КИЦ
+    // Загрузка списка КИЦ (городов) для данного ГОСБ
     async function loadKICList() {
         try {
             const resp = await fetch(`/api/cities-by-gosb?gosb_name=${encodeURIComponent('{{ gosb.name }}')}`);
@@ -215,6 +237,7 @@
             const select = document.getElementById('kic');
             select.innerHTML = '<option value="">Выберите город</option>';
             citiesMap = {};
+            citiesList = cities;
             cities.forEach(city => {
                 const opt = document.createElement('option');
                 opt.value = city.id;
@@ -227,26 +250,35 @@
         } catch (err) {
             console.error('KIC load error', err);
             const select = document.getElementById('kic');
-            select.innerHTML = '<option value="">Ошибка загрузки</option>';
+            select.innerHTML = '<option value="">Ошибка загрузки, используйте резервный список</option>';
+            const fallback = ['Екатеринбург', 'Нижний Тагил', 'Асбест', 'Первоуральск', 'Каменск-Уральский', 'Ирбит', 'Серов', 'Камышлов'];
+            fallback.forEach(city => {
+                const opt = document.createElement('option');
+                opt.value = city;
+                opt.textContent = city;
+                select.appendChild(opt);
+                citiesMap[city.toLowerCase()] = city;
+            });
             isKICLoaded = true;
             checkFormReady();
         }
     }
 
-    // Автодополнение ФИО
+    // Поиск сотрудников (автодополнение)
+    const searchInput = document.getElementById('employeeSearch');
+    const suggestionsDiv = document.getElementById('employeeSuggestions');
     const fioInput = document.getElementById('fio');
-    const suggestionsDiv = document.getElementById('fioSuggestions');
     const kicSelect = document.getElementById('kic');
-    let selectedEmployeeId = null;
+    const employeeIdInput = document.getElementById('selectedEmployeeId');
 
-    fioInput.addEventListener('input', async function() {
-        const query = this.value.trim();
-        if (query.length < 2) {
+    searchInput.addEventListener('input', async function() {
+        const q = this.value.trim();
+        if (q.length < 2) {
             suggestionsDiv.style.display = 'none';
             return;
         }
         try {
-            const response = await fetch(`/api/employees/search?q=${encodeURIComponent(query)}&limit=10`);
+            const response = await fetch(`/api/employees/search?q=${encodeURIComponent(q)}&limit=10`);
             const employees = await response.json();
             if (employees.length === 0) {
                 suggestionsDiv.style.display = 'none';
@@ -254,6 +286,7 @@
             }
             suggestionsDiv.innerHTML = '';
             employees.forEach(emp => {
+                // Извлекаем название города из kic_pi (последнее слово)
                 let cityName = '';
                 if (emp.kic_pi) {
                     const parts = emp.kic_pi.trim().split(/\s+/);
@@ -262,45 +295,54 @@
                 const div = document.createElement('div');
                 div.textContent = `${emp.fio} (таб. ${emp.tab_number || 'нет'}) — ${cityName}`;
                 div.addEventListener('click', () => {
+                    // Заполняем ФИО
                     fioInput.value = emp.fio;
-                    selectedEmployeeId = emp.id;
-                    // Автоматически выбрать город в select
-                    if (cityName && citiesMap[cityName.toLowerCase()]) {
-                        kicSelect.value = citiesMap[cityName.toLowerCase()];
-                    } else {
-                        // Если город не найден, пробуем найти частичным совпадением
-                        const found = Object.keys(citiesMap).find(key => key.includes(cityName.toLowerCase()) || cityName.toLowerCase().includes(key));
-                        if (found) kicSelect.value = citiesMap[found];
+                    employeeIdInput.value = emp.id;
+                    // Ищем cityId по названию города
+                    if (cityName) {
+                        const lowerCity = cityName.toLowerCase();
+                        const option = Array.from(kicSelect.options).find(opt => opt.text.toLowerCase() === lowerCity);
+                        if (option) {
+                            kicSelect.value = option.value;
+                        } else {
+                            // Если нет в списке, пытаемся добавить? Но лучше предупредить
+                            console.warn('Город не найден в списке:', cityName);
+                        }
                     }
+                    searchInput.value = emp.fio;
                     suggestionsDiv.style.display = 'none';
                 });
                 suggestionsDiv.appendChild(div);
             });
             suggestionsDiv.style.display = 'block';
         } catch (err) {
-            console.error('Employee search error', err);
+            console.error('Ошибка поиска сотрудников', err);
         }
     });
 
     document.addEventListener('click', function(e) {
-        if (e.target !== fioInput) suggestionsDiv.style.display = 'none';
+        if (e.target !== searchInput) {
+            suggestionsDiv.style.display = 'none';
+        }
     });
 
     function checkFormReady() {
         const btn = document.getElementById('submitBtn');
+        const btnText = document.getElementById('btnText');
         if (isLocationReady && isKICLoaded) {
             btn.disabled = false;
-            btn.textContent = '✅ Зарегистрироваться';
+            btnText.innerHTML = '✅ Зарегистрироваться';
         } else if (locationError && isKICLoaded) {
             btn.disabled = false;
-            btn.textContent = '⚠️ Зарегистрироваться (без точного адреса)';
+            btnText.innerHTML = '⚠️ Зарегистрироваться (без точного адреса)';
         } else {
             btn.disabled = true;
-            if (!isKICLoaded) btn.innerHTML = '<span class="spinner"></span> Загрузка городов...';
-            else if (!isLocationReady && !locationError) btn.innerHTML = '<span class="spinner"></span> Подготовка...';
+            if (!isKICLoaded) btnText.innerHTML = '<span class="spinner"></span> Загрузка городов...';
+            else if (!isLocationReady && !locationError) btnText.innerHTML = '<span class="spinner"></span> Подготовка...';
         }
     }
 
+    // Валидация ФИО (минимум два слова)
     function validateFIO(fio) {
         const parts = fio.trim().split(/\s+/);
         return parts.length >= 2 && parts.every(p => p.length > 1);
@@ -311,14 +353,19 @@
         statusDiv.innerHTML = message;
         statusDiv.className = `status ${type}`;
         statusDiv.style.display = 'block';
-        setTimeout(() => { if (statusDiv.style.display === 'block') statusDiv.style.display = 'none'; }, 5000);
+        setTimeout(() => {
+            if (statusDiv.style.display === 'block') statusDiv.style.display = 'none';
+        }, 5000);
     }
 
+    // Отправка формы
     document.getElementById('regForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+
         const fio = fioInput.value.trim();
         const cityId = kicSelect.value;
         const purpose = document.getElementById('purpose').value;
+        const employeeId = employeeIdInput.value;
 
         if (!validateFIO(fio)) {
             showStatus('❌ Укажите полные фамилию и имя (минимум два слова)', 'warning');
@@ -336,8 +383,9 @@
         }
 
         const btn = document.getElementById('submitBtn');
+        const btnTextSpan = document.getElementById('btnText');
         btn.disabled = true;
-        btn.innerHTML = '<span class="spinner"></span> Отправка...';
+        btnTextSpan.innerHTML = '<span class="spinner"></span> Отправка...';
 
         const payload = {
             fio: fio,
@@ -346,7 +394,7 @@
             latitude: locationData.lat,
             longitude: locationData.lng,
             gosb_slug: '{{ gosb.slug }}',
-            employee_id: selectedEmployeeId || null
+            employee_id: employeeId ? parseInt(employeeId) : null
         };
 
         try {
@@ -358,24 +406,28 @@
             const result = await resp.json();
             if (result.status === 'success') {
                 showStatus(`✅ Регистрация успешна!<br><small>${result.timestamp}</small><br>${result.address}`, 'success');
-                fioInput.value = '';
+                document.getElementById('regForm').reset();
                 kicSelect.selectedIndex = 0;
                 document.getElementById('purpose').selectedIndex = 0;
-                selectedEmployeeId = null;
-                setTimeout(() => { btn.disabled = false; btn.innerHTML = '✅ Зарегистрироваться'; }, 2000);
+                employeeIdInput.value = '';
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btnTextSpan.innerHTML = '✅ Зарегистрироваться';
+                }, 2000);
             } else {
-                showStatus(`❌ Ошибка: ${result.message}`, 'error');
+                showStatus(`❌ Ошибка: ${result.message || 'неизвестная ошибка'}`, 'error');
                 btn.disabled = false;
-                btn.innerHTML = '✅ Попробовать снова';
+                btnTextSpan.innerHTML = '✅ Попробовать снова';
             }
         } catch (err) {
             console.error(err);
-            showStatus(`❌ Ошибка соединения: ${err.message}`, 'error');
+            showStatus(`❌ Ошибка соединения: ${err.toString().slice(0, 150)}`, 'error');
             btn.disabled = false;
-            btn.innerHTML = '✅ Повторить регистрацию';
+            btnTextSpan.innerHTML = '✅ Повторить регистрацию';
         }
     });
 
+    // Инициализация
     window.onload = () => {
         initGeolocation();
         loadKICList();

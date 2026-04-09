@@ -53,7 +53,6 @@
             border-color: #1a73e8;
             outline: none;
             box-shadow: 0 0 0 3px rgba(26,115,232,0.2);
-            background: #ffffff;
         }
         select {
             appearance: none;
@@ -118,8 +117,8 @@
             color: #80868b;
             padding: 0 12px 18px;
         }
-        /* Стили для подсказок поиска сотрудника */
-        #employeeSuggestions {
+        /* Стили для подсказок под полем ФИО */
+        #fioSuggestions {
             background: white;
             border: 1px solid #ccc;
             border-radius: 12px;
@@ -127,17 +126,17 @@
             max-height: 200px;
             overflow-y: auto;
             position: absolute;
-            width: calc(100% - 36px);
+            width: 100%;
             z-index: 1000;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
-        #employeeSuggestions div {
+        #fioSuggestions div {
             padding: 10px 12px;
             cursor: pointer;
             border-bottom: 1px solid #eee;
         }
-        #employeeSuggestions div:last-child { border-bottom: none; }
-        #employeeSuggestions div:hover {
+        #fioSuggestions div:last-child { border-bottom: none; }
+        #fioSuggestions div:hover {
             background: #e8f0fe;
         }
     </style>
@@ -150,27 +149,22 @@
     </div>
     <div class="card-body">
         <form id="regForm">
-            <!-- Поле поиска сотрудника -->
-            <div class="form-group">
-                <label for="employeeSearch">🔍 Поиск сотрудника (ФИО / табельный номер)</label>
-                <input type="text" id="employeeSearch" placeholder="Начните вводить фамилию" autocomplete="off">
-                <div id="employeeSuggestions" style="display:none;"></div>
-                <input type="hidden" id="selectedEmployeeId">
-            </div>
-
-            <!-- ФИО (заполняется автоматически при выборе сотрудника) -->
+            <!-- Поле ФИО с автодополнением -->
             <div class="form-group">
                 <label for="fio">ФИО полностью *</label>
-                <input type="text" id="fio" placeholder="Иванов Иван Иванович" required>
+                <input type="text" id="fio" placeholder="Начните вводить фамилию" autocomplete="off" required>
+                <div id="fioSuggestions" style="display:none;"></div>
+                <input type="hidden" id="selectedEmployeeId">
+                <div class="hint">Начните вводить фамилию, выберите сотрудника из списка</div>
             </div>
 
-            <!-- КИЦ (город) – выпадающий список -->
+            <!-- КИЦ (город) – текстовое поле с datalist, заполняется автоматически -->
             <div class="form-group">
                 <label for="kic">КИЦ (город) *</label>
-                <select id="kic" required>
-                    <option value="">Загрузка списка...</option>
-                </select>
-                <div class="hint">Выберите ваш КИЦ</div>
+                <input type="text" id="kic" list="cityOptions" placeholder="Выберите или введите город" required>
+                <datalist id="cityOptions"></datalist>
+                <input type="hidden" id="city_id">
+                <div class="hint">Автоматически подставится после выбора сотрудника</div>
             </div>
 
             <!-- Цель визита -->
@@ -199,12 +193,12 @@
 <script>
     let locationData = { lat: null, lng: null };
     let isLocationReady = false;
-    let isKICLoaded = false;
+    let isCitiesLoaded = false;
     let locationError = false;
-    let citiesMap = {}; // { cityName: cityId }
-    let citiesList = []; // для select
+    let citiesMap = {};       // { normalizedCityName: cityId }
+    let citiesList = [];      // [{ id, name }]
 
-    // Геолокация
+    // --- Геолокация ---
     function initGeolocation() {
         if (!navigator.geolocation) {
             locationError = true;
@@ -229,49 +223,49 @@
         );
     }
 
-    // Загрузка списка КИЦ (городов) для данного ГОСБ
-    async function loadKICList() {
+    // --- Загрузка списка городов (для datalist) ---
+    async function loadCities() {
         try {
             const resp = await fetch(`/api/cities-by-gosb?gosb_name=${encodeURIComponent('{{ gosb.name }}')}`);
             const cities = await resp.json();
-            const select = document.getElementById('kic');
-            select.innerHTML = '<option value="">Выберите город</option>';
-            citiesMap = {};
             citiesList = cities;
+            const datalist = document.getElementById('cityOptions');
+            datalist.innerHTML = '';
+            citiesMap = {};
             cities.forEach(city => {
-                const opt = document.createElement('option');
-                opt.value = city.id;
-                opt.textContent = city.name;
-                select.appendChild(opt);
+                const option = document.createElement('option');
+                option.value = city.name;
+                datalist.appendChild(option);
                 citiesMap[city.name.toLowerCase()] = city.id;
             });
-            isKICLoaded = true;
+            isCitiesLoaded = true;
             checkFormReady();
         } catch (err) {
-            console.error('KIC load error', err);
-            const select = document.getElementById('kic');
-            select.innerHTML = '<option value="">Ошибка загрузки, используйте резервный список</option>';
-            const fallback = ['Екатеринбург', 'Нижний Тагил', 'Асбест', 'Первоуральск', 'Каменск-Уральский', 'Ирбит', 'Серов', 'Камышлов'];
-            fallback.forEach(city => {
-                const opt = document.createElement('option');
-                opt.value = city;
-                opt.textContent = city;
-                select.appendChild(opt);
-                citiesMap[city.toLowerCase()] = city;
-            });
-            isKICLoaded = true;
+            console.error('Ошибка загрузки городов', err);
+            isCitiesLoaded = true; // форма станет активной, но без городов
             checkFormReady();
         }
     }
 
-    // Поиск сотрудников (автодополнение)
-    const searchInput = document.getElementById('employeeSearch');
-    const suggestionsDiv = document.getElementById('employeeSuggestions');
-    const fioInput = document.getElementById('fio');
-    const kicSelect = document.getElementById('kic');
-    const employeeIdInput = document.getElementById('selectedEmployeeId');
+    // При ручном вводе города (или выборе из datalist) – сохраняем city_id
+    const kicInput = document.getElementById('kic');
+    const cityIdHidden = document.getElementById('city_id');
+    kicInput.addEventListener('input', function() {
+        const value = this.value.trim();
+        const foundId = citiesMap[value.toLowerCase()];
+        if (foundId) {
+            cityIdHidden.value = foundId;
+        } else {
+            cityIdHidden.value = '';
+        }
+    });
 
-    searchInput.addEventListener('input', async function() {
+    // --- Автодополнение ФИО с подстановкой города ---
+    const fioInput = document.getElementById('fio');
+    const suggestionsDiv = document.getElementById('fioSuggestions');
+    const employeeIdHidden = document.getElementById('selectedEmployeeId');
+
+    fioInput.addEventListener('input', async function() {
         const q = this.value.trim();
         if (q.length < 2) {
             suggestionsDiv.style.display = 'none';
@@ -297,19 +291,17 @@
                 div.addEventListener('click', () => {
                     // Заполняем ФИО
                     fioInput.value = emp.fio;
-                    employeeIdInput.value = emp.id;
-                    // Ищем cityId по названию города
+                    employeeIdHidden.value = emp.id;
+                    // Если есть город, подставляем в поле KИЦ и обновляем city_id
                     if (cityName) {
-                        const lowerCity = cityName.toLowerCase();
-                        const option = Array.from(kicSelect.options).find(opt => opt.text.toLowerCase() === lowerCity);
-                        if (option) {
-                            kicSelect.value = option.value;
+                        kicInput.value = cityName;
+                        const foundId = citiesMap[cityName.toLowerCase()];
+                        if (foundId) {
+                            cityIdHidden.value = foundId;
                         } else {
-                            // Если нет в списке, пытаемся добавить? Но лучше предупредить
-                            console.warn('Город не найден в списке:', cityName);
+                            cityIdHidden.value = '';
                         }
                     }
-                    searchInput.value = emp.fio;
                     suggestionsDiv.style.display = 'none';
                 });
                 suggestionsDiv.appendChild(div);
@@ -320,29 +312,31 @@
         }
     });
 
+    // Скрывать подсказки при потере фокуса
     document.addEventListener('click', function(e) {
-        if (e.target !== searchInput) {
+        if (e.target !== fioInput) {
             suggestionsDiv.style.display = 'none';
         }
     });
 
+    // --- Проверка готовности формы ---
     function checkFormReady() {
         const btn = document.getElementById('submitBtn');
         const btnText = document.getElementById('btnText');
-        if (isLocationReady && isKICLoaded) {
+        if (isLocationReady && isCitiesLoaded) {
             btn.disabled = false;
             btnText.innerHTML = '✅ Зарегистрироваться';
-        } else if (locationError && isKICLoaded) {
+        } else if (locationError && isCitiesLoaded) {
             btn.disabled = false;
             btnText.innerHTML = '⚠️ Зарегистрироваться (без точного адреса)';
         } else {
             btn.disabled = true;
-            if (!isKICLoaded) btnText.innerHTML = '<span class="spinner"></span> Загрузка городов...';
+            if (!isCitiesLoaded) btnText.innerHTML = '<span class="spinner"></span> Загрузка городов...';
             else if (!isLocationReady && !locationError) btnText.innerHTML = '<span class="spinner"></span> Подготовка...';
         }
     }
 
-    // Валидация ФИО (минимум два слова)
+    // Валидация ФИО
     function validateFIO(fio) {
         const parts = fio.trim().split(/\s+/);
         return parts.length >= 2 && parts.every(p => p.length > 1);
@@ -358,14 +352,14 @@
         }, 5000);
     }
 
-    // Отправка формы
+    // --- Отправка формы ---
     document.getElementById('regForm').addEventListener('submit', async (e) => {
         e.preventDefault();
 
         const fio = fioInput.value.trim();
-        const cityId = kicSelect.value;
+        const cityId = cityIdHidden.value;
         const purpose = document.getElementById('purpose').value;
-        const employeeId = employeeIdInput.value;
+        const employeeId = employeeIdHidden.value;
 
         if (!validateFIO(fio)) {
             showStatus('❌ Укажите полные фамилию и имя (минимум два слова)', 'warning');
@@ -373,8 +367,8 @@
             return;
         }
         if (!cityId) {
-            showStatus('❌ Выберите КИЦ (город)', 'warning');
-            kicSelect.focus();
+            showStatus('❌ Выберите корректный КИЦ (город)', 'warning');
+            kicInput.focus();
             return;
         }
         if (!purpose) {
@@ -406,10 +400,11 @@
             const result = await resp.json();
             if (result.status === 'success') {
                 showStatus(`✅ Регистрация успешна!<br><small>${result.timestamp}</small><br>${result.address}`, 'success');
-                document.getElementById('regForm').reset();
-                kicSelect.selectedIndex = 0;
+                fioInput.value = '';
+                kicInput.value = '';
+                cityIdHidden.value = '';
+                employeeIdHidden.value = '';
                 document.getElementById('purpose').selectedIndex = 0;
-                employeeIdInput.value = '';
                 setTimeout(() => {
                     btn.disabled = false;
                     btnTextSpan.innerHTML = '✅ Зарегистрироваться';
@@ -427,10 +422,10 @@
         }
     });
 
-    // Инициализация
+    // --- Инициализация ---
     window.onload = () => {
         initGeolocation();
-        loadKICList();
+        loadCities();
     };
 </script>
 </body>

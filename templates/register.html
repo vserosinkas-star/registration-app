@@ -7,7 +7,7 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
             background: linear-gradient(135deg, #f0f4fa 0%, #e2eaf2 100%);
             min-height: 100vh;
             display: flex;
@@ -31,64 +31,99 @@
         }
         .card-header h1 { font-size: 1.9rem; margin-bottom: 6px; }
         .card-body { padding: 28px 26px 32px; }
-        .form-group { margin-bottom: 24px; position: relative; }
-        label { display: block; font-weight: 500; margin-bottom: 8px; color: #202124; }
+        .form-group { margin-bottom: 24px; }
+        label {
+            display: block;
+            font-weight: 500;
+            color: #202124;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
         input, select {
             width: 100%;
             padding: 14px 18px;
+            font-size: 1rem;
             border: 1px solid #dadce0;
             border-radius: 20px;
-            font-size: 1rem;
-            font-family: inherit;
             background: #fefefe;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        input:focus, select:focus {
+            border-color: #1a73e8;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(26,115,232,0.2);
+            background: #ffffff;
+        }
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%235f6368'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            background-size: 20px;
+        }
+        .hint {
+            font-size: 0.75rem;
+            color: #5f6368;
+            margin-top: 6px;
+            margin-left: 8px;
         }
         .btn {
             width: 100%;
             background: #1a73e8;
             color: white;
             border: none;
-            padding: 16px;
+            padding: 16px 20px;
             border-radius: 40px;
+            font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
-        .btn:disabled { background: #bdc1c6; cursor: not-allowed; }
+        .btn:not(:disabled):hover {
+            background: #1765d1;
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(26,115,232,0.25);
+        }
+        .btn:active { transform: translateY(1px); }
+        .btn:disabled {
+            background: #bdc1c6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .spinner {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
         .status {
             margin-top: 24px;
-            padding: 16px;
+            padding: 16px 18px;
             border-radius: 24px;
-            display: none;
+            font-size: 0.9rem;
+            line-height: 1.4;
             text-align: center;
-        }
-        .status.success { background: #e6f4ea; color: #137333; }
-        .status.error { background: #fce8e6; color: #c5221f; }
-        /* Стили для автодополнения */
-        .suggestions {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: white;
-            border: 1px solid #dadce0;
-            border-radius: 20px;
-            max-height: 200px;
-            overflow-y: auto;
-            z-index: 1000;
             display: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
-        .suggestion-item {
-            padding: 10px 18px;
-            cursor: pointer;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        .suggestion-item:hover {
-            background: #f0f4fa;
-        }
-        .suggestion-item .tab-number {
-            font-size: 0.8rem;
-            color: #5f6368;
-            margin-left: 8px;
+        .status.success { background: #e6f4ea; color: #137333; border: 1px solid #b7e0c0; }
+        .status.error { background: #fce8e6; color: #c5221f; border: 1px solid #f5c2c0; }
+        .status.warning { background: #fff3e0; color: #b45f06; border: 1px solid #ffe6b3; }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.7rem;
+            color: #80868b;
+            padding: 0 12px 18px;
         }
     </style>
 </head>
@@ -102,106 +137,173 @@
         <form id="regForm">
             <div class="form-group">
                 <label for="fio">ФИО полностью *</label>
-                <input type="text" id="fio" placeholder="Начните вводить фамилию" autocomplete="off" required>
-                <div id="suggestions" class="suggestions"></div>
-                <input type="hidden" id="employeeId">
+                <input type="text" id="fio" placeholder="Иванов Иван Иванович" autocomplete="name" required>
+                <div class="hint">Например: Иванов Иван Иванович</div>
             </div>
+
             <div class="form-group">
-                <label for="city">КИЦ (город) *</label>
-                <select id="city" required>
-                    <option value="">Выберите город</option>
-                    {% for city in cities %}
-                    <option value="{{ city.id }}">{{ city.name }}</option>
-                    {% endfor %}
+                <label for="kic">КИЦ (город) *</label>
+                <select id="kic" required>
+                    <option value="">Загрузка списка...</option>
                 </select>
+                <div class="hint">Выберите ваш КИЦ</div>
             </div>
+
             <div class="form-group">
                 <label for="purpose">Цель визита *</label>
                 <select id="purpose" required>
+                    <option value="">Выберите программу</option>
                     <option value="Модуль 1">Модуль 1</option>
                     <option value="Модуль 2">Модуль 2</option>
                     <option value="ЕПП">Ежегодная периодическая проверка (ЕПП)</option>
                     <option value="Контраварийная подготовка">Контраварийная подготовка</option>
                 </select>
             </div>
-            <button type="submit" id="submitBtn" class="btn">Зарегистрироваться</button>
+
+            <button type="submit" id="submitBtn" class="btn" disabled>
+                <span class="btn-text" id="btnText">Подготовка...</span>
+            </button>
         </form>
         <div id="status" class="status"></div>
+    </div>
+    <div class="footer">
+        © 2026 Учебный центр. Все права защищены.
     </div>
 </div>
 
 <script>
     let locationData = { lat: null, lng: null };
-    let debounceTimer;
-    const fioInput = document.getElementById('fio');
-    const suggestionsDiv = document.getElementById('suggestions');
-    const employeeIdInput = document.getElementById('employeeId');
+    let isLocationReady = false;
+    let isKICLoaded = false;
+    let locationError = false;
 
     // Геолокация
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(pos => {
-            locationData.lat = pos.coords.latitude;
-            locationData.lng = pos.coords.longitude;
-        });
-    }
-
-    // Автодополнение при вводе
-    fioInput.addEventListener('input', function() {
-        const query = this.value.trim();
-        if (query.length < 2) {
-            suggestionsDiv.style.display = 'none';
+    function initGeolocation() {
+        if (!navigator.geolocation) {
+            locationError = true;
+            checkFormReady();
             return;
         }
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-            fetch(`/api/employees/search?q=${encodeURIComponent(query)}&limit=10`)
-                .then(res => res.json())
-                .then(employees => {
-                    if (employees.length === 0) {
-                        suggestionsDiv.style.display = 'none';
-                        return;
-                    }
-                    suggestionsDiv.innerHTML = '';
-                    employees.forEach(emp => {
-                        const div = document.createElement('div');
-                        div.className = 'suggestion-item';
-                        div.innerHTML = `${emp.fio} <span class="tab-number">(таб. ${emp.tab_number || '—'})</span>`;
-                        div.addEventListener('click', () => {
-                            fioInput.value = emp.fio;
-                            employeeIdInput.value = emp.id;
-                            suggestionsDiv.style.display = 'none';
-                        });
-                        suggestionsDiv.appendChild(div);
-                    });
-                    suggestionsDiv.style.display = 'block';
-                })
-                .catch(err => console.error('Ошибка поиска:', err));
-        }, 300);
-    });
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                locationData = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                isLocationReady = true;
+                checkFormReady();
+            },
+            (error) => {
+                console.warn('Geo error:', error);
+                locationError = true;
+                checkFormReady();
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    }
 
-    // Скрыть подсказки при клике вне
-    document.addEventListener('click', function(e) {
-        if (e.target !== fioInput) {
-            suggestionsDiv.style.display = 'none';
+    // Загрузка списка КИЦ (городов) для данного ГОСБ
+    async function loadKICList() {
+        try {
+            const resp = await fetch(`/api/cities-by-gosb?gosb_name=${encodeURIComponent('{{ gosb.name }}')}`);
+            const cities = await resp.json();
+            const select = document.getElementById('kic');
+            select.innerHTML = '<option value="">Выберите город</option>';
+            if (cities && cities.length) {
+                cities.forEach(city => {
+                    const opt = document.createElement('option');
+                    opt.value = city.id;   // сохраняем id города
+                    opt.textContent = city.name;
+                    select.appendChild(opt);
+                });
+            } else {
+                // резервный список (на случай ошибки)
+                const fallback = ['Екатеринбург', 'Нижний Тагил', 'Асбест', 'Первоуральск', 'Каменск-Уральский', 'Ирбит', 'Серов', 'Камышлов'];
+                fallback.forEach(city => {
+                    const opt = document.createElement('option');
+                    opt.value = city;
+                    opt.textContent = city;
+                    select.appendChild(opt);
+                });
+            }
+            isKICLoaded = true;
+            checkFormReady();
+        } catch (err) {
+            console.error('KIC load error', err);
+            const select = document.getElementById('kic');
+            select.innerHTML = '<option value="">Ошибка загрузки, используйте резервный список</option>';
+            const fallback = ['Екатеринбург', 'Нижний Тагил', 'Асбест', 'Первоуральск', 'Каменск-Уральский', 'Ирбит', 'Серов', 'Камышлов'];
+            fallback.forEach(city => {
+                const opt = document.createElement('option');
+                opt.value = city;
+                opt.textContent = city;
+                select.appendChild(opt);
+            });
+            isKICLoaded = true;
+            checkFormReady();
         }
-    });
+    }
+
+    function checkFormReady() {
+        const btn = document.getElementById('submitBtn');
+        const btnText = document.getElementById('btnText');
+        if (isLocationReady && isKICLoaded) {
+            btn.disabled = false;
+            btnText.innerHTML = '✅ Зарегистрироваться';
+        } else if (locationError && isKICLoaded) {
+            btn.disabled = false;
+            btnText.innerHTML = '⚠️ Зарегистрироваться (без точного адреса)';
+        } else {
+            btn.disabled = true;
+            if (!isKICLoaded) btnText.innerHTML = '<span class="spinner"></span> Загрузка городов...';
+            else if (!isLocationReady && !locationError) btnText.innerHTML = '<span class="spinner"></span> Подготовка...';
+        }
+    }
+
+    // Валидация ФИО (минимум два слова)
+    function validateFIO(fio) {
+        const parts = fio.trim().split(/\s+/);
+        return parts.length >= 2 && parts.every(p => p.length > 1);
+    }
+
+    function showStatus(message, type) {
+        const statusDiv = document.getElementById('status');
+        statusDiv.innerHTML = message;
+        statusDiv.className = `status ${type}`;
+        statusDiv.style.display = 'block';
+        setTimeout(() => {
+            if (statusDiv.style.display === 'block') statusDiv.style.display = 'none';
+        }, 5000);
+    }
 
     // Отправка формы
     document.getElementById('regForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const fio = fioInput.value.trim();
-        const cityId = document.getElementById('city').value;
-        const purpose = document.getElementById('purpose').value;
-        const employeeId = employeeIdInput.value;
 
-        if (!fio || !cityId || !purpose) {
-            showStatus('Заполните все поля', 'error');
+        const fio = document.getElementById('fio').value.trim();
+        const kicSelect = document.getElementById('kic');
+        const cityId = kicSelect.value;
+        const purpose = document.getElementById('purpose').value;
+
+        if (!validateFIO(fio)) {
+            showStatus('❌ Укажите полные фамилию и имя (минимум два слова)', 'warning');
+            document.getElementById('fio').focus();
+            return;
+        }
+        if (!cityId) {
+            showStatus('❌ Выберите КИЦ (город)', 'warning');
+            kicSelect.focus();
+            return;
+        }
+        if (!purpose) {
+            showStatus('❌ Выберите цель визита', 'warning');
             return;
         }
 
         const btn = document.getElementById('submitBtn');
+        const btnTextSpan = document.getElementById('btnText');
         btn.disabled = true;
-        btn.textContent = 'Отправка...';
+        btnTextSpan.innerHTML = '<span class="spinner"></span> Отправка...';
 
         const payload = {
             fio: fio,
@@ -209,8 +311,7 @@
             purpose: purpose,
             latitude: locationData.lat,
             longitude: locationData.lng,
-            gosb_slug: '{{ gosb.slug }}',
-            employee_id: employeeId || null
+            gosb_slug: '{{ gosb.slug }}'
         };
 
         try {
@@ -221,28 +322,33 @@
             });
             const result = await resp.json();
             if (result.status === 'success') {
-                showStatus(`✅ Регистрация успешна!<br>${result.address}`, 'success');
+                showStatus(`✅ Регистрация прошла успешно!<br><small>${result.timestamp}</small><br>${result.address}`, 'success');
                 document.getElementById('regForm').reset();
-                employeeIdInput.value = '';
-                suggestionsDiv.innerHTML = '';
+                // Сбросить select на "Выберите город"
+                kicSelect.selectedIndex = 0;
+                document.getElementById('purpose').selectedIndex = 0;
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btnTextSpan.innerHTML = '✅ Зарегистрироваться';
+                }, 2000);
             } else {
-                showStatus(`❌ Ошибка: ${result.message}`, 'error');
+                showStatus(`❌ Ошибка: ${result.message || 'неизвестная ошибка'}`, 'error');
+                btn.disabled = false;
+                btnTextSpan.innerHTML = '✅ Попробовать снова';
             }
         } catch (err) {
-            showStatus('Ошибка соединения', 'error');
-        } finally {
+            console.error(err);
+            showStatus(`❌ Ошибка соединения: ${err.toString().slice(0, 150)}`, 'error');
             btn.disabled = false;
-            btn.textContent = 'Зарегистрироваться';
+            btnTextSpan.innerHTML = '✅ Повторить регистрацию';
         }
     });
 
-    function showStatus(msg, type) {
-        const div = document.getElementById('status');
-        div.innerHTML = msg;
-        div.className = `status ${type}`;
-        div.style.display = 'block';
-        setTimeout(() => div.style.display = 'none', 5000);
-    }
+    // Инициализация
+    window.onload = () => {
+        initGeolocation();
+        loadKICList();
+    };
 </script>
 </body>
 </html>

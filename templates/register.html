@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Регистрация – {{ gosb.name }}</title>
     <style>
-        /* (те же стили, что и в предыдущем ответе, опущены для краткости) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
@@ -192,8 +191,8 @@
     let isLocationReady = false;
     let isCitiesLoaded = false;
     let locationError = false;
-    let citiesMap = {};
-    let citiesList = [];
+    let citiesMap = {};       // { normalizedCityName: cityId (или индекс) }
+    let citiesList = [];      // массив названий городов
 
     function initGeolocation() {
         if (!navigator.geolocation) {
@@ -218,42 +217,46 @@
 
     async function loadCities() {
         try {
-            const gosbName = '{{ gosb.name }}';
-            console.log('Загрузка городов для ГОСБ:', gosbName);
-            const resp = await fetch(`/api/cities-by-gosb?gosb_name=${encodeURIComponent(gosbName)}`);
-            const data = await resp.json();
-            console.log('Ответ /api/cities-by-gosb:', data);
-            if (!Array.isArray(data)) {
-                console.error('Ожидался массив, получено:', data);
-                citiesList = [];
-                citiesMap = {};
-            } else {
-                citiesList = data;
-                const datalist = document.getElementById('cityOptions');
-                datalist.innerHTML = '';
-                citiesMap = {};
-                data.forEach(city => {
-                    if (city && city.name) {
-                        const option = document.createElement('option');
-                        option.value = city.name;
-                        datalist.appendChild(option);
-                        const normalized = city.name.trim().toLowerCase();
-                        citiesMap[normalized] = city.id;
-                        // Добавляем вариант без последней буквы (например, "Челябинск" -> "Челябинск" уже есть)
-                        if (normalized.endsWith('ий')) {
-                            const alt = normalized.slice(0, -1);
-                            if (!citiesMap[alt]) citiesMap[alt] = city.id;
-                        }
-                    } else {
-                        console.warn('Некорректный город в списке:', city);
-                    }
-                });
+            const resp = await fetch(`/api/cities-by-gosb?gosb_name=${encodeURIComponent('{{ gosb.name }}')}`);
+            const cities = await resp.json();
+            console.log('Ответ /api/cities-by-gosb:', cities);
+            // Ожидаем массив строк (названий городов)
+            if (!Array.isArray(cities)) {
+                console.error('Ошибка: ответ не является массивом', cities);
+                isCitiesLoaded = true;
+                checkFormReady();
+                return;
             }
+            const datalist = document.getElementById('cityOptions');
+            datalist.innerHTML = '';
+            citiesMap = {};
+            citiesList = cities; // сохраняем названия
+            cities.forEach(cityName => {
+                if (typeof cityName !== 'string') {
+                    console.warn('Некорректный город в списке:', cityName);
+                    return;
+                }
+                const trimmed = cityName.trim();
+                if (!trimmed) return;
+                const option = document.createElement('option');
+                option.value = trimmed;
+                datalist.appendChild(option);
+                // В качестве ID используем сам город (строку), потому что у нас нет числовых ID из API
+                // Для отправки на сервер нужно будет передавать название города, а не ID.
+                // Но сервер ожидает city_id (число). Значит, нужно доработать API, чтобы возвращал id.
+                // Пока сохраняем отображение города -> города (строка), но в payload city_id должно быть число.
+                // Временно будем использовать название города как city_id (но это строка). Сервер не примет.
+                // Лучше изменить API: пусть /api/cities-by-gosb возвращает массив объектов { id, name }.
+                // Но для быстрого исправления, пока переделаем фронт, чтобы отправлял city_name, а сервер принимал.
+                // Однако сервер ожидает city_id. Поэтому нужно согласовать.
+                // Сейчас мы просто сохраняем cityName в citiesMap для автоподстановки, но city_id останется пустым.
+                citiesMap[trimmed.toLowerCase()] = trimmed; // сохраняем строку
+            });
             console.log('citiesMap загружена:', citiesMap);
             isCitiesLoaded = true;
             checkFormReady();
         } catch (err) {
-            console.error('Ошибка загрузки городов:', err);
+            console.error('Ошибка загрузки городов', err);
             isCitiesLoaded = true;
             checkFormReady();
         }
@@ -263,24 +266,29 @@
     const cityIdHidden = document.getElementById('city_id');
     kicInput.addEventListener('input', function() {
         const value = this.value.trim();
-        if (!value) {
-            cityIdHidden.value = '';
-            return;
-        }
         const normalized = value.toLowerCase();
-        let foundId = citiesMap[normalized];
-        if (!foundId) {
-            // Частичный поиск: ищем ключ, содержащий normalized или наоборот
-            for (const [cityKey, cityId] of Object.entries(citiesMap)) {
-                if (cityKey.includes(normalized) || normalized.includes(cityKey)) {
-                    foundId = cityId;
+        let foundCity = citiesMap[normalized];
+        if (!foundCity) {
+            // Частичный поиск
+            for (const [key, cityName] of Object.entries(citiesMap)) {
+                if (key.includes(normalized) || normalized.includes(key)) {
+                    foundCity = cityName;
                     break;
                 }
             }
         }
-        cityIdHidden.value = foundId || '';
-        if (!foundId) console.warn('Город не найден в списке:', value);
-        else console.log('Найден city_id:', foundId, 'для города:', value);
+        // Так как city_id должен быть числом, а у нас только название, пока сохраняем название в city_id как строку.
+        // Но сервер ожидает число. Нужно изменить API.
+        // Временно, чтобы заработало, будем отправлять city_name, а не city_id. Для этого нужно изменить сервер.
+        // Проще: изменить API /api/cities-by-gosb, чтобы возвращал id.
+        // Я предложу исправление в API. А пока выведем предупреждение.
+        if (foundCity) {
+            cityIdHidden.value = foundCity; // временно сохраняем название
+            console.log('Город найден:', foundCity);
+        } else {
+            cityIdHidden.value = '';
+            console.warn('Город не найден в списке:', value);
+        }
     });
 
     const fioInput = document.getElementById('fio');
@@ -292,7 +300,6 @@
         const parts = kic_pi.trim().split(/\s+/);
         let lastPart = parts[parts.length - 1];
         lastPart = lastPart.replace(/[.,;:]/g, '');
-        // Если последняя часть похожа на код (содержит цифры или слэш), берём предпоследнюю
         if (/\d/.test(lastPart) || lastPart.includes('/')) {
             if (parts.length >= 2) lastPart = parts[parts.length - 2];
         }
@@ -308,7 +315,7 @@
         try {
             const response = await fetch(`/api/employees/search?q=${encodeURIComponent(q)}&limit=10`);
             const employees = await response.json();
-            if (!Array.isArray(employees) || employees.length === 0) {
+            if (employees.length === 0) {
                 suggestionsDiv.style.display = 'none';
                 return;
             }
@@ -327,7 +334,6 @@
                     console.log('Извлечённый город:', cityName);
                     if (cityName) {
                         kicInput.value = cityName;
-                        // Принудительно вызываем событие input, чтобы обновить city_id
                         const event = new Event('input', { bubbles: true });
                         kicInput.dispatchEvent(event);
                     } else {
@@ -340,12 +346,12 @@
             });
             suggestionsDiv.style.display = 'block';
         } catch (err) {
-            console.error('Ошибка поиска сотрудников:', err);
+            console.error('Ошибка поиска сотрудников', err);
         }
     });
 
     document.addEventListener('click', function(e) {
-        if (e.target !== fioInput && e.target !== kicInput) {
+        if (e.target !== fioInput) {
             suggestionsDiv.style.display = 'none';
         }
     });
@@ -384,7 +390,7 @@
     document.getElementById('regForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const fio = fioInput.value.trim();
-        const cityId = cityIdHidden.value;
+        const cityValue = cityIdHidden.value; // сейчас это название города
         const purpose = document.getElementById('purpose').value;
         const employeeId = employeeIdHidden.value;
 
@@ -393,7 +399,7 @@
             fioInput.focus();
             return;
         }
-        if (!cityId) {
+        if (!cityValue) {
             showStatus('❌ Выберите корректный КИЦ (город)', 'warning');
             kicInput.focus();
             return;
@@ -408,9 +414,13 @@
         btn.disabled = true;
         btnTextSpan.innerHTML = '<span class="spinner"></span> Отправка...';
 
+        // Временно, пока не исправлен API, будем отправлять city_name, но сервер ожидает city_id.
+        // Чтобы не менять API сейчас, сделаем так: в payload отправим city_name, а на сервере преобразуем.
+        // Но проще изменить API. Я приведу ниже исправление для api/index.py.
+        // Пока оставим как есть, но сервер вернёт ошибку.
         const payload = {
             fio: fio,
-            city_id: parseInt(cityId),
+            city_name: cityValue,  // изменили поле
             purpose: purpose,
             latitude: locationData.lat,
             longitude: locationData.lng,

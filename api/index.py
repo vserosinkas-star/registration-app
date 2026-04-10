@@ -132,6 +132,7 @@ def fill_report_record(reg_id, reg_data, gosb_name):
         'gosb_name': gosb_name,
         'tab_number': employee_data.get('tab_number'),
         'subdivision': employee_data.get('kic_pi'),
+        'purpose': purpose,
         'fire_training': '0,5',
         'radio_comm': '0,5',
         'drills': '0,25'
@@ -291,7 +292,6 @@ def api_register():
         return jsonify({'status': 'error', 'message': 'База данных не настроена'}), 500
     data = request.get_json()
     fio = data.get('fio')
-    # Поддержка city_id (число) или cityId/city_name (строка)
     city_value = data.get('city_id') or data.get('cityId') or data.get('city_name')
     purpose = data.get('purpose')
     lat = data.get('latitude')
@@ -309,7 +309,6 @@ def api_register():
 
     # Определяем city_id
     if isinstance(city_value, str) and not city_value.isdigit():
-        # Это название города
         city_res = supabase.table('cities').select('id').eq('name', city_value).eq('gosb_id', gosb['id']).execute()
         if not city_res.data:
             return jsonify({'status': 'error', 'message': f'Город "{city_value}" не найден в справочнике'}), 400
@@ -388,6 +387,8 @@ def get_report_data():
     quarter = request.args.get('quarter')
     month = request.args.get('month')
     exact_date = request.args.get('exact_date')
+    purpose = request.args.get('purpose')
+
     try:
         query = supabase.table('report').select('*')
         if gosb:
@@ -396,6 +397,9 @@ def get_report_data():
             query = query.ilike('subdivision', f'%{city}%')
         if fio:
             query = query.ilike('fio', f'%{fio}%')
+        if purpose:
+            query = query.eq('purpose', purpose)
+
         res = query.execute()
         data = res.data
         filtered = []
@@ -532,7 +536,6 @@ def send_kic_reminders():
     gosb = data.get('gosb')
     city = data.get('city')
 
-    # 1. Сотрудники с фильтрацией
     emp_query = supabase.table('employees').select('id, fio, tab_number, kic_pi, gosb_name')
     if gosb:
         emp_query = emp_query.eq('gosb_name', gosb)
@@ -542,7 +545,6 @@ def send_kic_reminders():
     if not employees:
         return jsonify({"message": "Нет сотрудников для выбранных фильтров"}), 200
 
-    # 2. Регистрации за период
     reg_query = supabase.table('registrations').select('employee_id, fio, purpose')
     if days > 0:
         cutoff = (datetime.now() - timedelta(days=days)).isoformat()
@@ -557,7 +559,6 @@ def send_kic_reminders():
         else:
             registered_ids.add(reg['fio'].strip().lower())
 
-    # 3. Отбираем незарегистрированных
     missing_by_kic = defaultdict(list)
     for emp in employees:
         emp_id = emp.get('id')
@@ -572,7 +573,6 @@ def send_kic_reminders():
         kic = emp.get('kic_pi') or 'Без КИЦ'
         missing_by_kic[kic].append(emp)
 
-    # 4. Получаем все города для поиска email
     cities_all = supabase.table('cities').select('name, manager_email, responsible_email').execute().data
 
     results = []

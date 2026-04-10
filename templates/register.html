@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Регистрация – {{ gosb.name }}</title>
     <style>
+        /* (те же стили, что и в предыдущем ответе, опущены для краткости) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
@@ -191,7 +192,7 @@
     let isLocationReady = false;
     let isCitiesLoaded = false;
     let locationError = false;
-    let citiesMap = {};       // { normalizedCityName: cityId }
+    let citiesMap = {};
     let citiesList = [];
 
     function initGeolocation() {
@@ -217,29 +218,42 @@
 
     async function loadCities() {
         try {
-            const resp = await fetch(`/api/cities-by-gosb?gosb_name=${encodeURIComponent('{{ gosb.name }}')}`);
-            const cities = await resp.json();
-            citiesList = cities;
-            const datalist = document.getElementById('cityOptions');
-            datalist.innerHTML = '';
-            citiesMap = {};
-            cities.forEach(city => {
-                const option = document.createElement('option');
-                option.value = city.name;
-                datalist.appendChild(option);
-                const normalized = city.name.trim().toLowerCase();
-                citiesMap[normalized] = city.id;
-                // Также добавим вариант без окончания "ий" -> "й" (например, Челябинский -> Челябинск)
-                if (normalized.endsWith('ий')) {
-                    const alt = normalized.slice(0, -1);
-                    if (!citiesMap[alt]) citiesMap[alt] = city.id;
-                }
-            });
+            const gosbName = '{{ gosb.name }}';
+            console.log('Загрузка городов для ГОСБ:', gosbName);
+            const resp = await fetch(`/api/cities-by-gosb?gosb_name=${encodeURIComponent(gosbName)}`);
+            const data = await resp.json();
+            console.log('Ответ /api/cities-by-gosb:', data);
+            if (!Array.isArray(data)) {
+                console.error('Ожидался массив, получено:', data);
+                citiesList = [];
+                citiesMap = {};
+            } else {
+                citiesList = data;
+                const datalist = document.getElementById('cityOptions');
+                datalist.innerHTML = '';
+                citiesMap = {};
+                data.forEach(city => {
+                    if (city && city.name) {
+                        const option = document.createElement('option');
+                        option.value = city.name;
+                        datalist.appendChild(option);
+                        const normalized = city.name.trim().toLowerCase();
+                        citiesMap[normalized] = city.id;
+                        // Добавляем вариант без последней буквы (например, "Челябинск" -> "Челябинск" уже есть)
+                        if (normalized.endsWith('ий')) {
+                            const alt = normalized.slice(0, -1);
+                            if (!citiesMap[alt]) citiesMap[alt] = city.id;
+                        }
+                    } else {
+                        console.warn('Некорректный город в списке:', city);
+                    }
+                });
+            }
             console.log('citiesMap загружена:', citiesMap);
             isCitiesLoaded = true;
             checkFormReady();
         } catch (err) {
-            console.error('Ошибка загрузки городов', err);
+            console.error('Ошибка загрузки городов:', err);
             isCitiesLoaded = true;
             checkFormReady();
         }
@@ -249,10 +263,14 @@
     const cityIdHidden = document.getElementById('city_id');
     kicInput.addEventListener('input', function() {
         const value = this.value.trim();
+        if (!value) {
+            cityIdHidden.value = '';
+            return;
+        }
         const normalized = value.toLowerCase();
         let foundId = citiesMap[normalized];
         if (!foundId) {
-            // Частичный поиск: если значение входит в какой-то ключ
+            // Частичный поиск: ищем ключ, содержащий normalized или наоборот
             for (const [cityKey, cityId] of Object.entries(citiesMap)) {
                 if (cityKey.includes(normalized) || normalized.includes(cityKey)) {
                     foundId = cityId;
@@ -262,6 +280,7 @@
         }
         cityIdHidden.value = foundId || '';
         if (!foundId) console.warn('Город не найден в списке:', value);
+        else console.log('Найден city_id:', foundId, 'для города:', value);
     });
 
     const fioInput = document.getElementById('fio');
@@ -270,7 +289,6 @@
 
     function extractCityFromKic(kic_pi) {
         if (!kic_pi) return '';
-        // Ищем последнее слово, которое не содержит цифр и слэшей
         const parts = kic_pi.trim().split(/\s+/);
         let lastPart = parts[parts.length - 1];
         lastPart = lastPart.replace(/[.,;:]/g, '');
@@ -290,7 +308,7 @@
         try {
             const response = await fetch(`/api/employees/search?q=${encodeURIComponent(q)}&limit=10`);
             const employees = await response.json();
-            if (employees.length === 0) {
+            if (!Array.isArray(employees) || employees.length === 0) {
                 suggestionsDiv.style.display = 'none';
                 return;
             }
@@ -309,7 +327,7 @@
                     console.log('Извлечённый город:', cityName);
                     if (cityName) {
                         kicInput.value = cityName;
-                        // Принудительно вызовем обработчик input, чтобы обновить city_id
+                        // Принудительно вызываем событие input, чтобы обновить city_id
                         const event = new Event('input', { bubbles: true });
                         kicInput.dispatchEvent(event);
                     } else {
@@ -322,12 +340,12 @@
             });
             suggestionsDiv.style.display = 'block';
         } catch (err) {
-            console.error('Ошибка поиска сотрудников', err);
+            console.error('Ошибка поиска сотрудников:', err);
         }
     });
 
     document.addEventListener('click', function(e) {
-        if (e.target !== fioInput) {
+        if (e.target !== fioInput && e.target !== kicInput) {
             suggestionsDiv.style.display = 'none';
         }
     });

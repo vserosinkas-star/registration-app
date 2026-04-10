@@ -18,151 +18,29 @@
     <script src="https://npmcdn.com/flatpickr/dist/l10n/ru.js"></script>
 
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #0f0c29 0%, #1a1a2e 50%, #16213e 100%);
+        /* ... (все стили остаются как в предыдущей версии, добавить новые) ... */
+        .purpose-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        .btn-purpose {
+            padding: 0.4rem 1rem;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 20px;
+            background: transparent;
             color: #e0e0e0;
-            min-height: 100vh;
-            padding: 2rem 1.5rem;
-            position: relative;
-            overflow-x: auto;
-        }
-        body::before {
-            content: ''; position: fixed; top: -50%; left: -50%;
-            width: 200%; height: 200%;
-            background: radial-gradient(circle at 70% 30%, rgba(108, 92, 231, 0.15) 0%, transparent 50%);
-            z-index: 0; pointer-events: none;
-        }
-        .container {
-            max-width: 1600px; margin: 0 auto; position: relative; z-index: 1;
-            backdrop-filter: blur(10px);
-        }
-        h1 {
-            font-size: 2.5rem; font-weight: 700; margin-bottom: 1.5rem;
-            background: linear-gradient(90deg, #a8ede0, #fed6e3);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            text-shadow: 0 0 20px rgba(168, 237, 224, 0.3);
-            letter-spacing: -0.02em;
-        }
-        .filters-card {
-            background: rgba(20, 20, 40, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px; padding: 1.5rem; margin-bottom: 2rem;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-        }
-        .filters-grid {
-            display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;
-        }
-        .filter-item { flex: 1 1 180px; min-width: 160px; }
-        .filter-item label {
-            display: block; font-size: 0.8rem; font-weight: 600;
-            text-transform: uppercase; letter-spacing: 0.05em;
-            color: #a0a0c0; margin-bottom: 0.4rem;
-        }
-        .filter-item select, .filter-item input {
-            width: 100%; padding: 0.7rem 1rem;
-            background: rgba(10, 10, 20, 0.5);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 14px; font-family: 'Inter', sans-serif;
-            font-size: 0.95rem; color: #f0f0f0;
-            transition: all 0.2s; outline: none;
-        }
-        .filter-item select option { background: #1a1a2e; color: #fff; }
-        .filter-item input.flatpickr-input {
             cursor: pointer;
-            background: rgba(10, 10, 20, 0.5) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236c5ce7' stroke-width='2'%3E%3Crect x='3' y='4' width='18' height='18' rx='2' ry='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E") no-repeat right 10px center;
-        }
-        .filter-item input:focus, .filter-item select:focus {
-            border-color: #6c5ce7; box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.3);
-        }
-        .filter-buttons { display: flex; gap: 1rem; align-items: center; margin-left: auto; }
-        .btn {
-            padding: 0.7rem 2rem; border: none; border-radius: 14px;
-            font-family: 'Inter', sans-serif; font-weight: 600; font-size: 0.95rem;
-            cursor: pointer; transition: all 0.2s;
-            background: linear-gradient(135deg, #6c5ce7, #a463f5);
-            color: white; box-shadow: 0 10px 20px -5px rgba(108, 92, 231, 0.4);
-        }
-        .btn-outline {
-            background: transparent; border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: none; color: #e0e0e0;
-        }
-        .btn-outline:hover { border-color: #6c5ce7; background: rgba(108, 92, 231, 0.1); }
-        .btn:hover { transform: translateY(-2px); box-shadow: 0 15px 25px -5px #6c5ce7; }
-        .table-card {
-            background: rgba(20, 20, 40, 0.6);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px; padding: 1.5rem;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4); overflow-x: auto;
-        }
-        #dataTable { width: 100% !important; border-collapse: separate; border-spacing: 0 8px; margin-top: 0.5rem; }
-        #dataTable thead th {
-            background: rgba(40, 40, 60, 0.8); color: #c0c0e0; font-weight: 600;
-            font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;
-            padding: 1rem 0.8rem; border: none; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        #dataTable tbody tr {
-            background: rgba(30, 30, 50, 0.6); border-radius: 16px;
             transition: all 0.2s;
         }
-        #dataTable tbody tr:hover {
-            background: rgba(50, 50, 80, 0.8); transform: scale(1.002);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        .btn-purpose.active {
+            background: #6c5ce7;
+            border-color: #6c5ce7;
+            color: white;
         }
-        #dataTable td {
-            padding: 1rem 0.8rem; border: none; color: #e0e0f0;
-            font-size: 0.95rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        #dataTable tfoot input {
-            width: 100%; padding: 0.5rem 0.8rem;
-            background: rgba(10, 10, 20, 0.5);
-            border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px;
-            font-family: 'Inter', sans-serif; font-size: 0.85rem;
-            color: #f0f0f0;
-        }
-        .dataTables_wrapper .dataTables_paginate .paginate_button {
-            background: rgba(40, 40, 60, 0.6); border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px; color: #e0e0e0 !important; margin: 0 3px; padding: 0.5rem 1rem;
-        }
-        .dataTables_wrapper .dataTables_paginate .paginate_button.current {
-            background: #6c5ce7 !important; border-color: #6c5ce7; color: white !important;
-        }
-        .dataTables_wrapper .dataTables_length select,
-        .dataTables_wrapper .dataTables_filter input {
-            background: rgba(20, 20, 40, 0.6); border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px; color: #e0e0e0; padding: 0.4rem 1rem;
-        }
-        .records-counter {
-            display: inline-block;
-            margin-left: 1rem;
-            padding: 0.3rem 0.8rem;
-            background: rgba(108, 92, 231, 0.2);
-            border: 1px solid rgba(108, 92, 231, 0.4);
-            border-radius: 8px;
-            font-size: 0.85rem;
-            color: #a8ede0;
-            font-weight: 600;
-        }
-        .flatpickr-calendar {
-            background: rgba(20, 20, 40, 0.95) !important;
-            border: 1px solid rgba(108, 92, 231, 0.3) !important;
-            border-radius: 16px !important;
-        }
-        .flatpickr-day { color: #e0e0e0 !important; }
-        .flatpickr-day.selected { background: #6c5ce7 !important; border-color: #6c5ce7 !important; }
-        @media (max-width: 768px) {
-            body { padding: 0.5rem; }
-            h1 { font-size: 1.2rem; }
-            .filters-card { padding: 0.75rem; }
-            .filters-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-            .filter-item { min-width: auto; }
-            .filter-buttons { grid-column: 1 / -1; display: flex; gap: 0.5rem; margin-top: 0.5rem; }
-            .btn { padding: 0.3rem 0.8rem; font-size: 0.7rem; }
-            #dataTable { font-size: 0.7rem; }
-            #dataTable th, #dataTable td { padding: 0.3rem; }
+        .btn-purpose:hover {
+            border-color: #6c5ce7;
+            background: rgba(108,92,231,0.2);
         }
     </style>
 </head>
@@ -172,51 +50,23 @@
 
     <div class="filters-card">
         <div class="filters-grid">
-            <div class="filter-item">
-                <label for="gosbSelect">ГОСБ</label>
-                <select id="gosbSelect"><option value="">Все ГОСБ</option></select>
-            </div>
-            <div class="filter-item">
-                <label for="kicSelect">КИЦ</label>
-                <select id="kicSelect" disabled><option value="">Все КИЦ</option></select>
-            </div>
-            <div class="filter-item">
-                <label for="fioFilter">Ф.И.О.</label>
-                <input type="text" id="fioFilter" placeholder="Введите имя...">
-            </div>
-            <div class="filter-item">
-                <label for="datePicker">📅 Дата</label>
-                <input type="text" id="datePicker" class="flatpickr-input" placeholder="Выберите дату">
-            </div>
-            <div class="filter-item">
-                <label for="yearFilter">Год</label>
-                <select id="yearFilter"><option value="">Все годы</option></select>
-            </div>
-            <div class="filter-item">
-                <label for="quarterFilter">Квартал</label>
-                <select id="quarterFilter">
-                    <option value="">Все кварталы</option>
-                    <option value="1">1 Квартал</option>
-                    <option value="2">2 Квартал</option>
-                    <option value="3">3 Квартал</option>
-                    <option value="4">4 Квартал</option>
-                </select>
-            </div>
-            <div class="filter-item">
-                <label for="monthFilter">Месяц</label>
-                <select id="monthFilter">
-                    <option value="">Все месяцы</option>
-                    <option value="1">Январь</option><option value="2">Февраль</option><option value="3">Март</option>
-                    <option value="4">Апрель</option><option value="5">Май</option><option value="6">Июнь</option>
-                    <option value="7">Июль</option><option value="8">Август</option><option value="9">Сентябрь</option>
-                    <option value="10">Октябрь</option><option value="11">Ноябрь</option><option value="12">Декабрь</option>
-                </select>
+            <!-- ... существующие фильтры ... -->
+            <!-- Добавляем блок кнопок -->
+            <div class="filter-item" style="flex: 1 1 100%; margin-top: 0.5rem;">
+                <label>Фильтр по цели</label>
+                <div class="purpose-buttons">
+                    <button class="btn-purpose active" data-purpose="">Все</button>
+                    <button class="btn-purpose" data-purpose="Модуль 1">Модуль 1</button>
+                    <button class="btn-purpose" data-purpose="Модуль 2">Модуль 2</button>
+                    <button class="btn-purpose" data-purpose="ЕПП">ЕПП</button>
+                    <button class="btn-purpose" data-purpose="Контраварийная подготовка">Контраварийная</button>
+                </div>
             </div>
             <div class="filter-buttons">
                 <button class="btn" id="applyFilters">🔍 Применить</button>
                 <button class="btn btn-outline" id="resetFilters">↺ Сбросить</button>
                 <button class="btn btn-outline" id="refreshBtn">🔄 Обновить из базы</button>
-                <button class="btn btn-outline" id="sendTelegramBtn">📨 Отправить в СберЧат</button>
+                <button class="btn btn-outline" id="sendTelegramBtn">📨 Отправить сегодняшних в Telegram</button>
                 <button class="btn btn-outline" id="exportExcelBtn">📊 Выгрузить в Excel</button>
                 <button class="btn btn-outline" id="remindKicBtn">📧 Напомнить руководителям КИЦ</button>
             </div>
@@ -226,7 +76,7 @@
     <!-- Блок статистики -->
     <div id="statisticsCard" class="filters-card" style="display: none; margin-bottom: 1rem; padding: 1rem;">
         <div style="font-size: 1.2rem; font-weight: 600;">
-            📊 Статистика: <span id="statText">Обучено X из Y сотрудников (Z%)</span>
+            📊 Статистика: <span id="statText">Зарегистрировано X из Y сотрудников (Z%)</span>
         </div>
     </div>
 
@@ -258,97 +108,11 @@
     let table;
     let datePicker;
     let allGosb = [];
+    let currentPurpose = '';
 
-    async function loadGosbList() {
-        const resp = await fetch('/api/gosb-list');
-        const data = await resp.json();
-        allGosb = data;
-        const select = document.getElementById('gosbSelect');
-        select.innerHTML = '<option value="">Все ГОСБ</option>';
-        data.forEach(g => {
-            const opt = document.createElement('option');
-            opt.value = g.name;
-            opt.textContent = g.name;
-            select.appendChild(opt);
-        });
-    }
+    // ... (все существующие функции: loadGosbList, loadCities, initDatePicker, formatDateForApi, loadStatistics, loadTableData, resetFilters и т.д.)
 
-    document.getElementById('gosbSelect').addEventListener('change', async function() {
-        const gosbName = this.value;
-        const kicSelect = document.getElementById('kicSelect');
-        if (!gosbName) {
-            kicSelect.innerHTML = '<option value="">Все КИЦ</option>';
-            kicSelect.disabled = true;
-            return;
-        }
-        const resp = await fetch(`/api/cities-by-gosb?gosb_name=${encodeURIComponent(gosbName)}`);
-        const cities = await resp.json();
-        kicSelect.innerHTML = '<option value="">Все КИЦ</option>';
-        cities.forEach(city => {
-            const opt = document.createElement('option');
-            opt.value = city;
-            opt.textContent = city;
-            kicSelect.appendChild(opt);
-        });
-        kicSelect.disabled = false;
-    });
-
-    function initDatePicker() {
-        datePicker = flatpickr("#datePicker", {
-            locale: "ru",
-            dateFormat: "d.m.Y",
-            disableMobile: false,
-            allowInput: true
-        });
-    }
-
-    function formatDateForApi(dateStr) {
-        if (!dateStr) return null;
-        const parts = dateStr.split('.');
-        if (parts.length !== 3) return null;
-        return `${parts[2]}-${parts[1]}-${parts[0]}`;
-    }
-
-    async function loadStatistics() {
-        const gosb = document.getElementById('gosbSelect').value;
-        const city = document.getElementById('kicSelect').value;
-        const year = document.getElementById('yearFilter').value;
-        const quarter = document.getElementById('quarterFilter').value;
-        const month = document.getElementById('monthFilter').value;
-        const exactDate = formatDateForApi(document.getElementById('datePicker').value);
-
-        if (!gosb && !city) {
-            document.getElementById('statisticsCard').style.display = 'none';
-            return;
-        }
-
-        let url = '/api/statistics?';
-        const params = new URLSearchParams();
-        if (gosb) params.append('gosb', gosb);
-        if (city) params.append('city', city);
-        if (year) params.append('year', year);
-        if (quarter) params.append('quarter', quarter);
-        if (month) params.append('month', month);
-        if (exactDate) params.append('exact_date', exactDate);
-        url += params.toString();
-
-        try {
-            const resp = await fetch(url);
-            const stats = await resp.json();
-            const statCard = document.getElementById('statisticsCard');
-            if (stats.total_employees > 0) {
-                document.getElementById('statText').innerHTML = `Обучено <strong>${stats.registered_unique}</strong> из <strong>${stats.total_employees}</strong> сотрудников (<strong>${stats.percentage}%</strong>)`;
-                statCard.style.display = 'block';
-            } else {
-                document.getElementById('statText').innerHTML = `⚠️ Нет данных о сотрудниках для выбранного подразделения.`;
-                statCard.style.display = 'block';
-            }
-        } catch (err) {
-            console.error('Ошибка загрузки статистики:', err);
-            document.getElementById('statisticsCard').style.display = 'none';
-        }
-    }
-
+    // Изменённая функция loadTableData с учётом currentPurpose
     async function loadTableData() {
         const gosb = document.getElementById('gosbSelect').value;
         const city = document.getElementById('kicSelect').value;
@@ -367,6 +131,7 @@
         if (quarter) params.append('quarter', quarter);
         if (month) params.append('month', month);
         if (exactDate) params.append('exact_date', exactDate);
+        if (currentPurpose) params.append('purpose', currentPurpose);
         url += params.toString();
 
         const resp = await fetch(url);
@@ -391,20 +156,12 @@
             table.rows.add(tableData);
             table.draw();
         } else {
+            // инициализация DataTable
             table = $('#dataTable').DataTable({
                 data: tableData,
-                columns: [
-                    { title: "Дата и время" }, { title: "Табельный №" }, { title: "Ф.И.О." }, { title: "Подразделение" },
-                    { title: "Огневая ОЭТ" }, { title: "Блочное обучение" }, { title: "Радиосвязь" },
-                    { title: "Учения" }, { title: "Контраварийная" }, { title: "Модуль 1" }, { title: "ЕПП" }
-                ],
+                columns: [ /* ... */ ],
                 order: [[0, 'desc']],
-                language: {
-                    search: "Глобальный поиск:",
-                    lengthMenu: "Показать _MENU_ записей",
-                    info: "Записи с _START_ по _END_ из _TOTAL_",
-                    paginate: { first: "Первая", last: "Последняя", next: "→", previous: "←" }
-                },
+                language: { /* ... */ },
                 initComplete: function () {
                     this.api().columns().every(function () {
                         let column = this;
@@ -426,118 +183,20 @@
         $('#recordsCounter .total-count').text(filteredCount);
     }
 
-    function resetFilters() {
-        document.getElementById('gosbSelect').value = '';
-        document.getElementById('kicSelect').innerHTML = '<option value="">Все КИЦ</option>';
-        document.getElementById('kicSelect').disabled = true;
-        document.getElementById('fioFilter').value = '';
-        document.getElementById('yearFilter').value = '';
-        document.getElementById('quarterFilter').value = '';
-        document.getElementById('monthFilter').value = '';
-        if (datePicker) datePicker.clear();
-        loadTableData();
-        loadStatistics();
-    }
-
-    // Кнопка "Обновить из базы" – перезагружает данные без сброса фильтров
-    document.getElementById('refreshBtn').addEventListener('click', () => {
-        loadTableData();
-        loadStatistics();
+    // Обработчики кнопок цели
+    document.querySelectorAll('.btn-purpose').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.btn-purpose').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentPurpose = btn.getAttribute('data-purpose');
+            loadTableData();
+            loadStatistics();
+        });
     });
 
-    // Кнопка отправки отчётов в СберЧат
-    document.getElementById('sendTelegramBtn').addEventListener('click', async function() {
-        const btn = this;
-        btn.disabled = true;
-        btn.textContent = '⏳ Отправка...';
-        try {
-            const resp = await fetch('/api/send-today-reports', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            });
-            const result = await resp.json();
-            if (result.status === 'ok') {
-                alert(`Отчёты отправлены в ${result.sent} чатов`);
-            } else {
-                alert('Ошибка: ' + (result.message || 'неизвестная ошибка'));
-            }
-        } catch (err) {
-            alert('Ошибка соединения: ' + err.message);
-        } finally {
-            btn.disabled = false;
-            btn.textContent = '📨 Отправить в СберЧат';
-        }
-    });
-
-    // Кнопка выгрузки в Excel
-    document.getElementById('exportExcelBtn').addEventListener('click', async function() {
-        const filteredData = table.rows({ search: 'applied' }).data().toArray();
-        if (filteredData.length === 0) {
-            alert('Нет данных для выгрузки');
-            return;
-        }
-        const btn = this;
-        btn.disabled = true;
-        btn.textContent = '⏳ Создание...';
-        try {
-            const resp = await fetch('/api/export-excel', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ data: filteredData })
-            });
-            if (resp.ok) {
-                const blob = await resp.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `report_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.xlsx`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window.URL.revokeObjectURL(url);
-            } else {
-                const err = await resp.json();
-                alert('Ошибка при создании файла: ' + (err.message || 'неизвестная ошибка'));
-            }
-        } catch (err) {
-            alert('Ошибка соединения: ' + err.message);
-        } finally {
-            btn.disabled = false;
-            btn.textContent = '📊 Выгрузить в Excel';
-        }
-    });
-
-    // Кнопка отправки напоминаний руководителям КИЦ
-    document.getElementById('remindKicBtn').addEventListener('click', async function() {
-        const days = 30;
-        const purpose = '';
-        const btn = this;
-        btn.disabled = true;
-        btn.textContent = '⏳ Отправка...';
-        try {
-            const resp = await fetch('/api/send-kic-reminders', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ days, purpose })
-            });
-            const result = await resp.json();
-            if (result.status === 'ok') {
-                let msg = 'Напоминания отправлены:\n';
-                result.results.forEach(r => {
-                    if (r.error) msg += `${r.kic}: ${r.error}\n`;
-                    else msg += `${r.kic}: ${r.sent} сотрудников -> ${r.to}\n`;
-                });
-                alert(msg);
-            } else {
-                alert('Ошибка: ' + (result.message || 'неизвестная ошибка'));
-            }
-        } catch (err) {
-            alert('Ошибка соединения: ' + err.message);
-        } finally {
-            btn.disabled = false;
-            btn.textContent = '📧 Напомнить руководителям КИЦ';
-        }
-    });
+    // Остальные обработчики и функции без изменений...
+    // Не забудьте скопировать все остальные функции (loadGosbList, loadStatistics, resetFilters и т.д.)
+    // из предыдущей версии dashboard.html
 
     window.onload = async () => {
         initDatePicker();
@@ -551,6 +210,7 @@
         document.getElementById('resetFilters').addEventListener('click', () => {
             resetFilters();
         });
+        // Кнопка "Обновить из базы" уже есть
     };
 </script>
 </body>

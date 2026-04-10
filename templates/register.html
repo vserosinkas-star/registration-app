@@ -160,7 +160,7 @@
                 <label for="kic">КИЦ (город) *</label>
                 <input type="text" id="kic" list="cityOptions" placeholder="Выберите или введите город" required>
                 <datalist id="cityOptions"></datalist>
-                <input type="hidden" id="city_id">
+                <input type="hidden" id="city_name">
                 <div class="hint">Автоматически подставится после выбора сотрудника</div>
             </div>
 
@@ -191,7 +191,6 @@
     let isLocationReady = false;
     let isCitiesLoaded = false;
     let locationError = false;
-    let citiesMap = {};       // { normalizedCityName: cityId }
     let citiesList = [];
 
     function initGeolocation() {
@@ -219,34 +218,16 @@
         try {
             const resp = await fetch(`/api/cities-by-gosb?gosb_name=${encodeURIComponent('{{ gosb.name }}')}`);
             const cities = await resp.json();
-            console.log('Ответ /api/cities-by-gosb:', cities);
-            citiesList = cities;
+            console.log('Загружены города:', cities);
             const datalist = document.getElementById('cityOptions');
             datalist.innerHTML = '';
-            citiesMap = {};
-            cities.forEach(city => {
-                // city - это строка? или объект? В зависимости от API
-                let cityName, cityId;
-                if (typeof city === 'string') {
-                    cityName = city;
-                    cityId = city; // если строка, то cityId будет строкой, но позже преобразуем в число? Лучше, если сервер возвращает объекты {id, name}
-                } else {
-                    cityName = city.name;
-                    cityId = city.id;
-                }
-                if (!cityName) return;
+            citiesList = cities;
+            cities.forEach(cityName => {
+                if (!cityName || typeof cityName !== 'string') return;
                 const option = document.createElement('option');
                 option.value = cityName;
                 datalist.appendChild(option);
-                const normalized = cityName.trim().toLowerCase();
-                citiesMap[normalized] = cityId;
-                // Добавляем вариант без окончания "ий"
-                if (normalized.endsWith('ий')) {
-                    const alt = normalized.slice(0, -1);
-                    if (!citiesMap[alt]) citiesMap[alt] = cityId;
-                }
             });
-            console.log('citiesMap загружена:', citiesMap);
             isCitiesLoaded = true;
             checkFormReady();
         } catch (err) {
@@ -257,22 +238,15 @@
     }
 
     const kicInput = document.getElementById('kic');
-    const cityIdHidden = document.getElementById('city_id');
+    const cityNameHidden = document.getElementById('city_name');
     kicInput.addEventListener('input', function() {
         const value = this.value.trim();
-        const normalized = value.toLowerCase();
-        let foundId = citiesMap[normalized];
-        if (!foundId) {
-            // Частичный поиск: ищем, содержится ли normalized в каком-либо ключе
-            for (const [cityKey, cityId] of Object.entries(citiesMap)) {
-                if (cityKey.includes(normalized) || normalized.includes(cityKey)) {
-                    foundId = cityId;
-                    break;
-                }
-            }
+        const found = citiesList.some(city => city.toLowerCase() === value.toLowerCase());
+        if (found) {
+            cityNameHidden.value = value;
+        } else {
+            cityNameHidden.value = '';
         }
-        cityIdHidden.value = foundId || '';
-        if (!foundId) console.warn('Город не найден в списке:', value);
     });
 
     const fioInput = document.getElementById('fio');
@@ -284,7 +258,6 @@
         const parts = kic_pi.trim().split(/\s+/);
         let lastPart = parts[parts.length - 1];
         lastPart = lastPart.replace(/[.,;:]/g, '');
-        // Если последняя часть похожа на код (содержит цифры или слэш), берём предпоследнюю
         if (/\d/.test(lastPart) || lastPart.includes('/')) {
             if (parts.length >= 2) lastPart = parts[parts.length - 2];
         }
@@ -319,12 +292,10 @@
                     console.log('Извлечённый город:', cityName);
                     if (cityName) {
                         kicInput.value = cityName;
-                        // Принудительно вызываем событие input
-                        const event = new Event('input', { bubbles: true });
-                        kicInput.dispatchEvent(event);
+                        cityNameHidden.value = cityName;
                     } else {
                         kicInput.value = '';
-                        cityIdHidden.value = '';
+                        cityNameHidden.value = '';
                     }
                     suggestionsDiv.style.display = 'none';
                 });
@@ -376,18 +347,16 @@
     document.getElementById('regForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const fio = fioInput.value.trim();
-        const cityId = cityIdHidden.value;
+        const cityName = cityNameHidden.value;
         const purpose = document.getElementById('purpose').value;
         const employeeId = employeeIdHidden.value;
-
-        console.log('Отправка:', { fio, cityId, purpose, employeeId, locationData });
 
         if (!validateFIO(fio)) {
             showStatus('❌ Укажите полные фамилию и имя (минимум два слова)', 'warning');
             fioInput.focus();
             return;
         }
-        if (!cityId) {
+        if (!cityName) {
             showStatus('❌ Выберите корректный КИЦ (город)', 'warning');
             kicInput.focus();
             return;
@@ -404,13 +373,14 @@
 
         const payload = {
             fio: fio,
-            city_id: parseInt(cityId),
+            city_name: cityName,
             purpose: purpose,
             latitude: locationData.lat,
             longitude: locationData.lng,
             gosb_slug: '{{ gosb.slug }}',
             employee_id: employeeId ? parseInt(employeeId) : null
         };
+        console.log('Отправка:', payload);
 
         try {
             const resp = await fetch('/api/register', {
@@ -423,7 +393,7 @@
                 showStatus(`✅ Регистрация успешна!<br><small>${result.timestamp}</small><br>${result.address}`, 'success');
                 fioInput.value = '';
                 kicInput.value = '';
-                cityIdHidden.value = '';
+                cityNameHidden.value = '';
                 employeeIdHidden.value = '';
                 document.getElementById('purpose').selectedIndex = 0;
                 setTimeout(() => {

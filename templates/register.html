@@ -5,33 +5,140 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Регистрация – {{ gosb.name }}</title>
     <style>
-        /* (стили остаются без изменений, как в предыдущей версии) */
+        /* (стили такие же, как в предыдущей версии, можно скопировать из предыдущего ответа) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Roboto, system-ui, sans-serif; background: linear-gradient(135deg, #f0f4fa 0%, #e2eaf2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .card { max-width: 560px; width: 100%; background: #ffffff; border-radius: 32px; box-shadow: 0 20px 35px -12px rgba(0,0,0,0.15); overflow: hidden; }
-        .card-header { background: #1a73e8; padding: 28px 24px 20px; text-align: center; color: white; }
+        body {
+            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+            background: linear-gradient(135deg, #f0f4fa 0%, #e2eaf2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .card {
+            max-width: 560px;
+            width: 100%;
+            background: #ffffff;
+            border-radius: 32px;
+            box-shadow: 0 20px 35px -12px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+        .card-header {
+            background: #1a73e8;
+            padding: 28px 24px 20px;
+            text-align: center;
+            color: white;
+        }
         .card-header h1 { font-size: 1.9rem; margin-bottom: 6px; }
         .card-body { padding: 28px 26px 32px; }
         .form-group { margin-bottom: 24px; position: relative; }
-        label { display: block; font-weight: 500; color: #202124; margin-bottom: 8px; font-size: 0.95rem; }
-        input, select { width: 100%; padding: 14px 18px; font-size: 1rem; border: 1px solid #dadce0; border-radius: 20px; background: #fefefe; transition: all 0.2s; font-family: inherit; }
-        input:focus, select:focus { border-color: #1a73e8; outline: none; box-shadow: 0 0 0 3px rgba(26,115,232,0.2); }
-        select { appearance: none; background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%235f6368'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 16px center; background-size: 20px; }
-        .hint { font-size: 0.75rem; color: #5f6368; margin-top: 6px; margin-left: 8px; }
-        .btn { width: 100%; background: #1a73e8; color: white; border: none; padding: 16px 20px; border-radius: 40px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; margin-top: 12px; }
-        .btn:not(:disabled):hover { background: #1765d1; transform: translateY(-1px); box-shadow: 0 8px 18px rgba(26,115,232,0.25); }
-        .btn:disabled { background: #bdc1c6; cursor: not-allowed; }
-        .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: white; animation: spin 0.8s linear infinite; }
+        label {
+            display: block;
+            font-weight: 500;
+            color: #202124;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+        input, select {
+            width: 100%;
+            padding: 14px 18px;
+            font-size: 1rem;
+            border: 1px solid #dadce0;
+            border-radius: 20px;
+            background: #fefefe;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        input:focus, select:focus {
+            border-color: #1a73e8;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(26,115,232,0.2);
+        }
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%235f6368'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            background-size: 20px;
+        }
+        .hint {
+            font-size: 0.75rem;
+            color: #5f6368;
+            margin-top: 6px;
+            margin-left: 8px;
+        }
+        .btn {
+            width: 100%;
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 16px 20px;
+            border-radius: 40px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 12px;
+        }
+        .btn:not(:disabled):hover {
+            background: #1765d1;
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(26,115,232,0.25);
+        }
+        .btn:disabled {
+            background: #bdc1c6;
+            cursor: not-allowed;
+        }
+        .spinner {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+        }
         @keyframes spin { to { transform: rotate(360deg); } }
-        .status { margin-top: 24px; padding: 16px 18px; border-radius: 24px; font-size: 0.9rem; text-align: center; display: none; }
+        .status {
+            margin-top: 24px;
+            padding: 16px 18px;
+            border-radius: 24px;
+            font-size: 0.9rem;
+            text-align: center;
+            display: none;
+        }
         .status.success { background: #e6f4ea; color: #137333; border: 1px solid #b7e0c0; }
         .status.error { background: #fce8e6; color: #c5221f; border: 1px solid #f5c2c0; }
         .status.warning { background: #fff3e0; color: #b45f06; border: 1px solid #ffe6b3; }
-        .footer { text-align: center; margin-top: 20px; font-size: 0.7rem; color: #80868b; padding: 0 12px 18px; }
-        #fioSuggestions { background: white; border: 1px solid #ccc; border-radius: 12px; margin-top: 4px; max-height: 200px; overflow-y: auto; position: absolute; width: 100%; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        #fioSuggestions div { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #eee; }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.7rem;
+            color: #80868b;
+            padding: 0 12px 18px;
+        }
+        #fioSuggestions {
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 12px;
+            margin-top: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            position: absolute;
+            width: 100%;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        #fioSuggestions div {
+            padding: 10px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
         #fioSuggestions div:last-child { border-bottom: none; }
-        #fioSuggestions div:hover { background: #e8f0fe; }
+        #fioSuggestions div:hover {
+            background: #e8f0fe;
+        }
     </style>
 </head>
 <body>
@@ -86,7 +193,7 @@
     let isCitiesLoaded = false;
     let locationError = false;
     let citiesMap = {};       // { normalizedCityName: cityId }
-    let citiesList = [];      // [{ id, name }]
+    let citiesList = [];
 
     function initGeolocation() {
         if (!navigator.geolocation) {
@@ -96,10 +203,7 @@
         }
         navigator.geolocation.getCurrentPosition(
             (position) => {
-                locationData = {
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude
-                };
+                locationData = { lat: position.coords.latitude, lng: position.coords.longitude };
                 isLocationReady = true;
                 checkFormReady();
             },
@@ -140,40 +244,20 @@
     kicInput.addEventListener('input', function() {
         const value = this.value.trim();
         const foundId = citiesMap[value.toLowerCase()];
-        if (foundId) {
-            cityIdHidden.value = foundId;
-        } else {
-            cityIdHidden.value = '';
-        }
+        cityIdHidden.value = foundId || '';
+        if (!foundId) console.warn('Город не найден в списке:', value);
     });
 
     const fioInput = document.getElementById('fio');
     const suggestionsDiv = document.getElementById('fioSuggestions');
     const employeeIdHidden = document.getElementById('selectedEmployeeId');
 
-    // Извлекаем последнее слово (город) из kic_pi
     function extractCityFromKic(kic_pi) {
         if (!kic_pi) return '';
         const parts = kic_pi.trim().split(/\s+/);
         let lastPart = parts[parts.length - 1];
-        // Убираем возможные знаки препинания
         lastPart = lastPart.replace(/[.,;:]/g, '');
         return lastPart;
-    }
-
-    // Поиск id города по названию (частичное совпадение)
-    function findCityId(cityName) {
-        if (!cityName) return null;
-        const lowerCity = cityName.toLowerCase();
-        // Сначала точное совпадение
-        if (citiesMap[lowerCity]) return citiesMap[lowerCity];
-        // Затем частичное (город содержится в названии из списка)
-        for (const [cName, cId] of Object.entries(citiesMap)) {
-            if (cName.includes(lowerCity) || lowerCity.includes(cName)) {
-                return cId;
-            }
-        }
-        return null;
     }
 
     fioInput.addEventListener('input', async function() {
@@ -203,13 +287,13 @@
                     let cityName = extractCityFromKic(emp.kic_pi);
                     if (cityName) {
                         kicInput.value = cityName;
-                        const foundId = findCityId(cityName);
+                        // Принудительно обновим city_id
+                        const foundId = citiesMap[cityName.toLowerCase()];
                         if (foundId) {
                             cityIdHidden.value = foundId;
-                            console.log(`Город найден: ${cityName} -> id ${foundId}`);
                         } else {
                             cityIdHidden.value = '';
-                            console.warn(`Город не найден: ${cityName} (kic_pi: ${emp.kic_pi})`);
+                            console.warn('Город не найден в citiesMap:', cityName);
                         }
                     } else {
                         kicInput.value = '';
@@ -264,7 +348,6 @@
 
     document.getElementById('regForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-
         const fio = fioInput.value.trim();
         const cityId = cityIdHidden.value;
         const purpose = document.getElementById('purpose').value;

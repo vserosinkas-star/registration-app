@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Регистрация – {{ gosb.name }}</title>
     <style>
+        /* стили без изменений (как в предыдущей версии) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
@@ -259,20 +260,10 @@
         }
     });
 
-    // --- Автодополнение ФИО с подстановкой города ---
+    // --- Автодополнение ФИО с подстановкой города (частичное вхождение) ---
     const fioInput = document.getElementById('fio');
     const suggestionsDiv = document.getElementById('fioSuggestions');
     const employeeIdHidden = document.getElementById('selectedEmployeeId');
-
-    // Извлекаем название города из строки kic_pi (последнее слово)
-    function extractCityFromKic(kic_pi) {
-        if (!kic_pi) return '';
-        const parts = kic_pi.trim().split(/\s+/);
-        let lastPart = parts[parts.length - 1];
-        // Удаляем возможные знаки препинания
-        lastPart = lastPart.replace(/[.,;:]/g, '');
-        return lastPart;
-    }
 
     fioInput.addEventListener('input', async function() {
         const q = this.value.trim();
@@ -291,32 +282,41 @@
             employees.forEach(emp => {
                 let displayText = emp.fio;
                 if (emp.tab_number) displayText += ` (таб. ${emp.tab_number})`;
-                // Извлекаем город для отображения
+                // Попробуем отобразить город
                 let cityForDisplay = '';
                 if (emp.kic_pi) {
-                    cityForDisplay = extractCityFromKic(emp.kic_pi);
+                    const lowerKic = emp.kic_pi.toLowerCase();
+                    for (const [cityNameLower, cityId] of Object.entries(citiesMap)) {
+                        if (lowerKic.includes(cityNameLower)) {
+                            const cityObj = citiesList.find(c => c.id === cityId);
+                            if (cityObj) cityForDisplay = cityObj.name;
+                            break;
+                        }
+                    }
                 }
                 if (cityForDisplay) displayText += ` — ${cityForDisplay}`;
                 const div = document.createElement('div');
                 div.textContent = displayText;
                 div.addEventListener('click', () => {
-                    // Заполняем ФИО и employee_id
                     fioInput.value = emp.fio;
                     employeeIdHidden.value = emp.id;
-                    // Извлекаем город
-                    let cityName = '';
+                    // Ищем город частичным вхождением
+                    let foundCityId = null;
+                    let foundCityName = null;
                     if (emp.kic_pi) {
-                        cityName = extractCityFromKic(emp.kic_pi);
-                    }
-                    if (cityName) {
-                        kicInput.value = cityName;
-                        const foundId = citiesMap[cityName.toLowerCase()];
-                        if (foundId) {
-                            cityIdHidden.value = foundId;
-                        } else {
-                            cityIdHidden.value = '';
-                            console.warn('Город не найден в списке:', cityName);
+                        const lowerKic = emp.kic_pi.toLowerCase();
+                        for (const [cityNameLower, cityId] of Object.entries(citiesMap)) {
+                            if (lowerKic.includes(cityNameLower) || cityNameLower.includes(lowerKic)) {
+                                foundCityId = cityId;
+                                const cityObj = citiesList.find(c => c.id === cityId);
+                                if (cityObj) foundCityName = cityObj.name;
+                                break;
+                            }
                         }
+                    }
+                    if (foundCityId) {
+                        kicInput.value = foundCityName;
+                        cityIdHidden.value = foundCityId;
                     } else {
                         kicInput.value = '';
                         cityIdHidden.value = '';
@@ -331,7 +331,6 @@
         }
     });
 
-    // Скрывать подсказки при потере фокуса
     document.addEventListener('click', function(e) {
         if (e.target !== fioInput) {
             suggestionsDiv.style.display = 'none';
@@ -439,7 +438,6 @@
         }
     });
 
-    // --- Инициализация ---
     window.onload = () => {
         initGeolocation();
         loadCities();

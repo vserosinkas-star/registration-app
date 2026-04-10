@@ -150,7 +150,6 @@ def fill_report_record(reg_id, reg_data, gosb_name):
         logging.error(f"fill_report_record error: {e}")
 
 def is_duplicate_registration(fio, purpose):
-    """Проверяет, регистрировался ли сотрудник на ту же цель в текущем квартале"""
     if not supabase:
         return False
     try:
@@ -292,14 +291,31 @@ def api_register():
         return jsonify({'status': 'error', 'message': 'База данных не настроена'}), 500
     data = request.get_json()
     fio = data.get('fio')
-    city_id = data.get('city_id')
+    # Поддержка city_id (число) или cityId/city_name (строка)
+    city_value = data.get('city_id') or data.get('cityId') or data.get('city_name')
     purpose = data.get('purpose')
     lat = data.get('latitude')
     lng = data.get('longitude')
     gosb_slug = data.get('gosb_slug')
-    employee_id = data.get('employee_id')
-    if not fio or not city_id or not purpose:
+    employee_id = data.get('employee_id') or data.get('employeeId')
+
+    if not fio or not city_value or not purpose:
+        logging.error(f"Missing fields: fio={fio}, city={city_value}, purpose={purpose}")
         return jsonify({'status': 'error', 'message': 'Не все поля заполнены'}), 400
+
+    gosb = get_gosb_by_slug(gosb_slug)
+    if not gosb:
+        return jsonify({'status': 'error', 'message': 'ГОСБ не найден'}), 400
+
+    # Определяем city_id
+    if isinstance(city_value, str) and not city_value.isdigit():
+        # Это название города
+        city_res = supabase.table('cities').select('id').eq('name', city_value).eq('gosb_id', gosb['id']).execute()
+        if not city_res.data:
+            return jsonify({'status': 'error', 'message': f'Город "{city_value}" не найден в справочнике'}), 400
+        city_id = city_res.data[0]['id']
+    else:
+        city_id = int(city_value)
 
     # Проверка дубликата
     if is_duplicate_registration(fio, purpose):
@@ -307,10 +323,6 @@ def api_register():
             'status': 'error',
             'message': f'❌ {fio} уже зарегистрирован на "{purpose}" в этом квартале.'
         }), 400
-
-    gosb = get_gosb_by_slug(gosb_slug)
-    if not gosb:
-        return jsonify({'status': 'error', 'message': 'ГОСБ не найден'}), 400
 
     address = reverse_geocode(lat, lng) if lat and lng else 'Адрес не определён'
 
@@ -320,7 +332,7 @@ def api_register():
         'purpose': purpose,
         'address': address,
         'timestamp': datetime.utcnow().isoformat(),
-        'employee_id': employee_id if employee_id else None
+        'employee_id': int(employee_id) if employee_id and str(employee_id).isdigit() else None
     }
     try:
         result = supabase.table('registrations').insert(reg_data).execute()
@@ -509,7 +521,7 @@ def get_statistics():
         "percentage": round(percentage, 1)
     })
 
-# ========== НАПОМИНАНИЯ РУКОВОДИТЕЛЯМ КИЦ (с фильтрацией) ==========
+# ========== НАПОМИНАНИЯ РУКОВОДИТЕЛЯМ КИЦ ==========
 @app.route('/api/send-kic-reminders', methods=['POST'])
 def send_kic_reminders():
     if not supabase:
@@ -560,12 +572,11 @@ def send_kic_reminders():
         kic = emp.get('kic_pi') or 'Без КИЦ'
         missing_by_kic[kic].append(emp)
 
-    # 4. Получаем все города для поиска email (один раз)
+    # 4. Получаем все города для поиска email
     cities_all = supabase.table('cities').select('name, manager_email, responsible_email').execute().data
 
     results = []
     for kic, emp_list in missing_by_kic.items():
-        # Если выбран конкретный город, но текущий kic не соответствует – пропускаем
         if city and city.lower() not in kic.lower():
             continue
         manager_email = None

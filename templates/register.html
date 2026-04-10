@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Регистрация – {{ gosb.name }}</title>
     <style>
-        /* (стили такие же, как в предыдущей версии, можно скопировать) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
@@ -220,31 +219,31 @@
         try {
             const resp = await fetch(`/api/cities-by-gosb?gosb_name=${encodeURIComponent('{{ gosb.name }}')}`);
             const cities = await resp.json();
-            console.log('Загружены города:', cities);
+            console.log('Ответ /api/cities-by-gosb:', cities);
             citiesList = cities;
             const datalist = document.getElementById('cityOptions');
             datalist.innerHTML = '';
             citiesMap = {};
             cities.forEach(city => {
-                if (!city || !city.name) {
-                    console.warn('Некорректный город в списке:', city);
-                    return;
+                // city - это строка? или объект? В зависимости от API
+                let cityName, cityId;
+                if (typeof city === 'string') {
+                    cityName = city;
+                    cityId = city; // если строка, то cityId будет строкой, но позже преобразуем в число? Лучше, если сервер возвращает объекты {id, name}
+                } else {
+                    cityName = city.name;
+                    cityId = city.id;
                 }
-                const cityName = city.name.trim();
+                if (!cityName) return;
                 const option = document.createElement('option');
                 option.value = cityName;
                 datalist.appendChild(option);
-                const normalized = cityName.toLowerCase();
-                citiesMap[normalized] = city.id;
-                // Добавляем вариант без окончания "ий" -> "й" (например, Челябинский -> Челябинск)
+                const normalized = cityName.trim().toLowerCase();
+                citiesMap[normalized] = cityId;
+                // Добавляем вариант без окончания "ий"
                 if (normalized.endsWith('ий')) {
                     const alt = normalized.slice(0, -1);
-                    if (!citiesMap[alt]) citiesMap[alt] = city.id;
-                }
-                // Также добавим вариант без "ский" (например, Челябинский -> Челябинск)
-                if (normalized.endsWith('ский')) {
-                    const alt = normalized.replace('ский', 'ск');
-                    if (!citiesMap[alt]) citiesMap[alt] = city.id;
+                    if (!citiesMap[alt]) citiesMap[alt] = cityId;
                 }
             });
             console.log('citiesMap загружена:', citiesMap);
@@ -264,7 +263,7 @@
         const normalized = value.toLowerCase();
         let foundId = citiesMap[normalized];
         if (!foundId) {
-            // Частичный поиск: если значение входит в какой-то ключ или наоборот
+            // Частичный поиск: ищем, содержится ли normalized в каком-либо ключе
             for (const [cityKey, cityId] of Object.entries(citiesMap)) {
                 if (cityKey.includes(normalized) || normalized.includes(cityKey)) {
                     foundId = cityId;
@@ -274,7 +273,6 @@
         }
         cityIdHidden.value = foundId || '';
         if (!foundId) console.warn('Город не найден в списке:', value);
-        else console.log('Найден ID для города', value, ':', foundId);
     });
 
     const fioInput = document.getElementById('fio');
@@ -283,7 +281,6 @@
 
     function extractCityFromKic(kic_pi) {
         if (!kic_pi) return '';
-        // Ищем последнее слово, которое не содержит цифр и слэшей
         const parts = kic_pi.trim().split(/\s+/);
         let lastPart = parts[parts.length - 1];
         lastPart = lastPart.replace(/[.,;:]/g, '');
@@ -322,7 +319,7 @@
                     console.log('Извлечённый город:', cityName);
                     if (cityName) {
                         kicInput.value = cityName;
-                        // Принудительно вызовем обработчик input, чтобы обновить city_id
+                        // Принудительно вызываем событие input
                         const event = new Event('input', { bubbles: true });
                         kicInput.dispatchEvent(event);
                     } else {
@@ -383,7 +380,7 @@
         const purpose = document.getElementById('purpose').value;
         const employeeId = employeeIdHidden.value;
 
-        console.log('Отправка:', { fio, cityId, purpose, employeeId });
+        console.log('Отправка:', { fio, cityId, purpose, employeeId, locationData });
 
         if (!validateFIO(fio)) {
             showStatus('❌ Укажите полные фамилию и имя (минимум два слова)', 'warning');

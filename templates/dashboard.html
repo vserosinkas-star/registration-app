@@ -11,6 +11,8 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
@@ -153,8 +155,29 @@
         }
         .flatpickr-day { color: #e0e0e0 !important; }
         .flatpickr-day.selected { background: #6c5ce7 !important; border-color: #6c5ce7 !important; }
-
-        /* Стили для кнопок фильтра по целям */
+        /* Стили для графиков */
+        .charts-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .chart-card {
+            flex: 1;
+            min-width: 280px;
+            background: rgba(20, 20, 40, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 1rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        }
+        .chart-card h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
         .purpose-buttons {
             display: flex;
             flex-wrap: wrap;
@@ -169,8 +192,6 @@
             color: #e0e0e0;
             cursor: pointer;
             transition: all 0.2s;
-            font-family: 'Inter', sans-serif;
-            font-size: 0.9rem;
         }
         .btn-purpose.active {
             background: #6c5ce7;
@@ -181,7 +202,6 @@
             border-color: #6c5ce7;
             background: rgba(108,92,231,0.2);
         }
-
         @media (max-width: 768px) {
             body { padding: 0.5rem; }
             h1 { font-size: 1.2rem; }
@@ -192,8 +212,6 @@
             .btn { padding: 0.3rem 0.8rem; font-size: 0.7rem; }
             #dataTable { font-size: 0.7rem; }
             #dataTable th, #dataTable td { padding: 0.3rem; }
-            .purpose-buttons { margin-top: 0; }
-            .btn-purpose { padding: 0.2rem 0.6rem; font-size: 0.7rem; }
         }
     </style>
 </head>
@@ -243,9 +261,7 @@
                     <option value="10">Октябрь</option><option value="11">Ноябрь</option><option value="12">Декабрь</option>
                 </select>
             </div>
-
-            <!-- Блок кнопок фильтрации по цели -->
-            <div class="filter-item" style="flex: 1 1 100%; margin-top: 0.5rem;">
+            <div class="filter-item" style="flex: 1 1 100%;">
                 <label>Фильтр по цели</label>
                 <div class="purpose-buttons">
                     <button class="btn-purpose active" data-purpose="">Все</button>
@@ -255,7 +271,6 @@
                     <button class="btn-purpose" data-purpose="Контраварийная подготовка">Контраварийная</button>
                 </div>
             </div>
-
             <div class="filter-buttons">
                 <button class="btn" id="applyFilters">🔍 Применить</button>
                 <button class="btn btn-outline" id="resetFilters">↺ Сбросить</button>
@@ -264,6 +279,26 @@
                 <button class="btn btn-outline" id="exportExcelBtn">📊 Выгрузить в Excel</button>
                 <button class="btn btn-outline" id="remindKicBtn">📧 Напомнить руководителям КИЦ</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Блок графиков -->
+    <div class="charts-row">
+        <div class="chart-card">
+            <h3>Регистрации по дням</h3>
+            <canvas id="dailyChart" width="400" height="250"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>Распределение по целям</h3>
+            <canvas id="purposeChart" width="400" height="250"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>Топ‑10 КИЦ</h3>
+            <canvas id="kicChart" width="400" height="250"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>Процент обученности</h3>
+            <canvas id="enrollmentChart" width="400" height="250"></canvas>
         </div>
     </div>
 
@@ -302,9 +337,9 @@
     let table;
     let datePicker;
     let allGosb = [];
-    let currentPurpose = '';   // переменная для хранения выбранной цели
+    let currentPurpose = '';
+    let dailyChart, purposeChart, kicChart, enrollmentChart;
 
-    // Загрузка списка ГОСБ
     async function loadGosbList() {
         const resp = await fetch('/api/gosb-list');
         const data = await resp.json();
@@ -319,7 +354,6 @@
         });
     }
 
-    // При смене ГОСБ загружаем города
     document.getElementById('gosbSelect').addEventListener('change', async function() {
         const gosbName = this.value;
         const kicSelect = document.getElementById('kicSelect');
@@ -340,7 +374,6 @@
         kicSelect.disabled = false;
     });
 
-    // Инициализация flatpickr
     function initDatePicker() {
         datePicker = flatpickr("#datePicker", {
             locale: "ru",
@@ -357,7 +390,6 @@
         return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
 
-    // Статистика
     async function loadStatistics() {
         const gosb = document.getElementById('gosbSelect').value;
         const city = document.getElementById('kicSelect').value;
@@ -398,7 +430,6 @@
         }
     }
 
-    // Загрузка данных таблицы с учётом всех фильтров, включая цель
     async function loadTableData() {
         const gosb = document.getElementById('gosbSelect').value;
         const city = document.getElementById('kicSelect').value;
@@ -477,7 +508,124 @@
         $('#recordsCounter .total-count').text(filteredCount);
     }
 
-    // Сброс всех фильтров, включая цель
+    async function loadCharts() {
+        const gosb = document.getElementById('gosbSelect').value;
+        const city = document.getElementById('kicSelect').value;
+        const year = document.getElementById('yearFilter').value;
+        const quarter = document.getElementById('quarterFilter').value;
+        const month = document.getElementById('monthFilter').value;
+        const exactDate = formatDateForApi(document.getElementById('datePicker').value);
+
+        let url = '/api/charts-data?';
+        const params = new URLSearchParams();
+        if (gosb) params.append('gosb', gosb);
+        if (city) params.append('city', city);
+        if (year) params.append('year', year);
+        if (quarter) params.append('quarter', quarter);
+        if (month) params.append('month', month);
+        if (exactDate) params.append('exact_date', exactDate);
+        if (currentPurpose) params.append('purpose', currentPurpose);
+        url += params.toString();
+
+        const resp = await fetch(url);
+        const data = await resp.json();
+        if (data.error) {
+            console.error(data.error);
+            return;
+        }
+
+        // 1. Столбчатая диаграмма по дням
+        if (dailyChart) dailyChart.destroy();
+        const ctxDaily = document.getElementById('dailyChart').getContext('2d');
+        dailyChart = new Chart(ctxDaily, {
+            type: 'bar',
+            data: {
+                labels: data.days,
+                datasets: [{
+                    label: 'Регистрации',
+                    data: data.daily_counts,
+                    backgroundColor: 'rgba(108, 92, 231, 0.6)',
+                    borderColor: '#6c5ce7',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: { legend: { labels: { color: '#e0e0e0' } } },
+                scales: { x: { ticks: { color: '#e0e0e0', maxRotation: 45 } }, y: { ticks: { color: '#e0e0e0' } } }
+            }
+        });
+
+        // 2. Круговая диаграмма по целям
+        if (purposeChart) purposeChart.destroy();
+        const ctxPurpose = document.getElementById('purposeChart').getContext('2d');
+        purposeChart = new Chart(ctxPurpose, {
+            type: 'pie',
+            data: {
+                labels: data.purposes,
+                datasets: [{
+                    data: data.purpose_counts,
+                    backgroundColor: ['#6c5ce7', '#a463f5', '#fed6e3', '#a8ede0', '#ff9f43']
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'bottom', labels: { color: '#e0e0e0' } } }
+            }
+        });
+
+        // 3. Горизонтальная столбчатая диаграмма (топ-10 КИЦ)
+        if (kicChart) kicChart.destroy();
+        const ctxKic = document.getElementById('kicChart').getContext('2d');
+        kicChart = new Chart(ctxKic, {
+            type: 'bar',
+            data: {
+                labels: data.kic_labels,
+                datasets: [{
+                    label: 'Кол-во регистраций',
+                    data: data.kic_values,
+                    backgroundColor: 'rgba(168, 237, 224, 0.6)',
+                    borderColor: '#a8ede0',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                plugins: { legend: { labels: { color: '#e0e0e0' } } },
+                scales: { x: { ticks: { color: '#e0e0e0' } }, y: { ticks: { color: '#e0e0e0' } } }
+            }
+        });
+
+        // 4. Процент обученности
+        const notRegistered = data.total_employees - data.registered_count;
+        if (enrollmentChart) enrollmentChart.destroy();
+        const ctxEnroll = document.getElementById('enrollmentChart').getContext('2d');
+        enrollmentChart = new Chart(ctxEnroll, {
+            type: 'doughnut',
+            data: {
+                labels: ['Зарегистрированы', 'Не зарегистрированы'],
+                datasets: [{
+                    data: [data.registered_count, notRegistered],
+                    backgroundColor: ['#6c5ce7', '#2d2d4a'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: '#e0e0e0' } },
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => `${ctx.label}: ${ctx.raw} чел. (${((ctx.raw / data.total_employees) * 100).toFixed(1)}%)`
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     function resetFilters() {
         document.getElementById('gosbSelect').value = '';
         document.getElementById('kicSelect').innerHTML = '<option value="">Все КИЦ</option>';
@@ -487,37 +635,33 @@
         document.getElementById('quarterFilter').value = '';
         document.getElementById('monthFilter').value = '';
         if (datePicker) datePicker.clear();
-        // Сброс фильтра по цели
+        // Сбросить кнопки цели
+        document.querySelectorAll('.btn-purpose').forEach(btn => btn.classList.remove('active'));
+        document.querySelector('.btn-purpose[data-purpose=""]').classList.add('active');
         currentPurpose = '';
-        document.querySelectorAll('.btn-purpose').forEach(btn => {
-            btn.classList.remove('active');
-            if (btn.getAttribute('data-purpose') === '') btn.classList.add('active');
-        });
         loadTableData();
         loadStatistics();
+        loadCharts();
     }
 
-    // Обработчики кнопок фильтра по цели
-    function initPurposeButtons() {
-        const buttons = document.querySelectorAll('.btn-purpose');
-        buttons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                buttons.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                currentPurpose = btn.getAttribute('data-purpose');
-                loadTableData();
-                loadStatistics();
-            });
+    // Обработчики кнопок цели
+    document.querySelectorAll('.btn-purpose').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.btn-purpose').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentPurpose = btn.getAttribute('data-purpose');
+            loadTableData();
+            loadStatistics();
+            loadCharts();
         });
-    }
+    });
 
-    // Кнопка "Обновить из базы"
     document.getElementById('refreshBtn').addEventListener('click', () => {
         loadTableData();
         loadStatistics();
+        loadCharts();
     });
 
-    // Кнопка отправки отчётов в СберЧат
     document.getElementById('sendTelegramBtn').addEventListener('click', async function() {
         const btn = this;
         btn.disabled = true;
@@ -541,7 +685,6 @@
         }
     });
 
-    // Кнопка выгрузки в Excel
     document.getElementById('exportExcelBtn').addEventListener('click', async function() {
         const filteredData = table.rows({ search: 'applied' }).data().toArray();
         if (filteredData.length === 0) {
@@ -579,10 +722,9 @@
         }
     });
 
-    // Кнопка отправки напоминаний руководителям КИЦ
     document.getElementById('remindKicBtn').addEventListener('click', async function() {
         const days = 30;
-        const purpose = currentPurpose;  // можно передать выбранную цель
+        const purpose = '';
         const btn = this;
         btn.disabled = true;
         btn.textContent = '⏳ Отправка...';
@@ -611,16 +753,16 @@
         }
     });
 
-    // Инициализация при загрузке страницы
     window.onload = async () => {
         initDatePicker();
         await loadGosbList();
-        initPurposeButtons();
         await loadTableData();
         await loadStatistics();
+        await loadCharts();
         document.getElementById('applyFilters').addEventListener('click', () => {
             loadTableData();
             loadStatistics();
+            loadCharts();
         });
         document.getElementById('resetFilters').addEventListener('click', () => {
             resetFilters();

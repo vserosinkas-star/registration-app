@@ -603,6 +603,199 @@ def send_kic_reminders():
         return jsonify({"message": "Нет подходящих КИЦ для отправки"}), 200
     return jsonify({"status": "ok", "results": results})
 
+# ========== ГРАФИКИ (с фильтрацией) ==========
+@app.route('/api/charts-data')
+def charts_data():
+    if not supabase:
+        return jsonify({"error": "База данных не инициализирована"}), 500
+    try:
+        gosb = request.args.get('gosb')
+        city = request.args.get('city')
+        year = request.args.get('year')
+        quarter = request.args.get('quarter')
+        month = request.args.get('month')
+        exact_date = request.args.get('exact_date')
+        purpose_filter = request.args.get('purpose')
+
+        # 1. Регистрации по дням (за последние 30 дней с фильтрацией)
+        end_date = date.today()
+        start_date = end_date - timedelta(days=30)
+        query = supabase.table('report').select('timestamp, subdivision, purpose, gosb_name')
+        if gosb:
+            query = query.eq('gosb_name', gosb)
+        if city:
+            query = query.ilike('subdivision', f'%{city}%')
+        if purpose_filter:
+            query = query.eq('purpose', purpose_filter)
+
+        res = query.execute()
+        days_count = {}
+        for row in res.data:
+            ts = row.get('timestamp')
+            if not ts:
+                continue
+            try:
+                utc_dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                yekat_dt = utc_dt.replace(tzinfo=pytz.UTC).astimezone(YEKAT_TIMEZONE)
+                if exact_date and yekat_dt.date().isoformat() != exact_date:
+                    continue
+                if year and str(yekat_dt.year) != year:
+                    continue
+                if quarter:
+                    q = (yekat_dt.month - 1) // 3 + 1
+                    if str(q) != quarter:
+                        continue
+                if month and str(yekat_dt.month) != month:
+                    continue
+                day_str = yekat_dt.strftime('%Y-%m-%d')
+                days_count[day_str] = days_count.get(day_str, 0) + 1
+            except:
+                continue
+
+        all_days = []
+        daily_counts = []
+        current = start_date
+        while current <= end_date:
+            day_str = current.strftime('%Y-%m-%d')
+            all_days.append(day_str)
+            daily_counts.append(days_count.get(day_str, 0))
+            current += timedelta(days=1)
+
+        # 2. Распределение по целям
+        query_purpose = supabase.table('report').select('purpose, timestamp, gosb_name, subdivision')
+        if gosb:
+            query_purpose = query_purpose.eq('gosb_name', gosb)
+        if city:
+            query_purpose = query_purpose.ilike('subdivision', f'%{city}%')
+        if purpose_filter:
+            query_purpose = query_purpose.eq('purpose', purpose_filter)
+        res_purpose = query_purpose.execute()
+        purpose_counts = {}
+        for row in res_purpose.data:
+            ts = row.get('timestamp')
+            if not ts:
+                continue
+            try:
+                utc_dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                yekat_dt = utc_dt.replace(tzinfo=pytz.UTC).astimezone(YEKAT_TIMEZONE)
+                if exact_date and yekat_dt.date().isoformat() != exact_date:
+                    continue
+                if year and str(yekat_dt.year) != year:
+                    continue
+                if quarter:
+                    q = (yekat_dt.month - 1) // 3 + 1
+                    if str(q) != quarter:
+                        continue
+                if month and str(yekat_dt.month) != month:
+                    continue
+                p = row.get('purpose') or 'Не указано'
+                purpose_counts[p] = purpose_counts.get(p, 0) + 1
+            except:
+                continue
+        purpose_counts = {k: v for k, v in purpose_counts.items() if k and k != 'Не указано'}
+        if not purpose_counts:
+            purpose_counts = {'Нет данных': 1}
+
+        # 3. Топ-10 КИЦ
+        query_kic = supabase.table('report').select('subdivision, timestamp, gosb_name')
+        if gosb:
+            query_kic = query_kic.eq('gosb_name', gosb)
+        if city:
+            query_kic = query_kic.ilike('subdivision', f'%{city}%')
+        if purpose_filter:
+            query_kic = query_kic.eq('purpose', purpose_filter)
+        res_kic = query_kic.execute()
+        kic_counts = {}
+        for row in res_kic.data:
+            ts = row.get('timestamp')
+            if not ts:
+                continue
+            try:
+                utc_dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                yekat_dt = utc_dt.replace(tzinfo=pytz.UTC).astimezone(YEKAT_TIMEZONE)
+                if exact_date and yekat_dt.date().isoformat() != exact_date:
+                    continue
+                if year and str(yekat_dt.year) != year:
+                    continue
+                if quarter:
+                    q = (yekat_dt.month - 1) // 3 + 1
+                    if str(q) != quarter:
+                        continue
+                if month and str(yekat_dt.month) != month:
+                    continue
+                k = row.get('subdivision') or 'Без КИЦ'
+                kic_counts[k] = kic_counts.get(k, 0) + 1
+            except:
+                continue
+        top_kic = sorted(kic_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+        kic_labels = [item[0] for item in top_kic]
+        kic_values = [item[1] for item in top_kic]
+
+        # 4. Процент обученности
+        emp_query = supabase.table('employees').select('tab_number, fio, kic_pi, gosb_name')
+        if gosb:
+            emp_query = emp_query.eq('gosb_name', gosb)
+        if city:
+            emp_query = emp_query.ilike('kic_pi', f'%{city}%')
+        emp_res = emp_query.execute()
+        employee_ids = set()
+        for e in emp_res.data:
+            if e.get('tab_number'):
+                employee_ids.add(e['tab_number'])
+            elif e.get('fio'):
+                employee_ids.add(e['fio'].strip().lower())
+        total_employees = len(employee_ids)
+
+        reg_query = supabase.table('report').select('tab_number, fio, timestamp')
+        if gosb:
+            reg_query = reg_query.eq('gosb_name', gosb)
+        if city:
+            reg_query = reg_query.ilike('subdivision', f'%{city}%')
+        if purpose_filter:
+            reg_query = reg_query.eq('purpose', purpose_filter)
+        reg_res = reg_query.execute()
+        registered_ids = set()
+        for row in reg_res.data:
+            ts = row.get('timestamp')
+            if not ts:
+                continue
+            try:
+                utc_dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                yekat_dt = utc_dt.replace(tzinfo=pytz.UTC).astimezone(YEKAT_TIMEZONE)
+                if exact_date and yekat_dt.date().isoformat() != exact_date:
+                    continue
+                if year and str(yekat_dt.year) != year:
+                    continue
+                if quarter:
+                    q = (yekat_dt.month - 1) // 3 + 1
+                    if str(q) != quarter:
+                        continue
+                if month and str(yekat_dt.month) != month:
+                    continue
+                if row.get('tab_number'):
+                    registered_ids.add(row['tab_number'])
+                elif row.get('fio'):
+                    registered_ids.add(row['fio'].strip().lower())
+            except:
+                continue
+        registered_count = len(registered_ids)
+        percentage = round((registered_count / total_employees * 100), 1) if total_employees > 0 else 0
+
+        return jsonify({
+            "days": all_days,
+            "daily_counts": daily_counts,
+            "purposes": list(purpose_counts.keys()),
+            "purpose_counts": list(purpose_counts.values()),
+            "kic_labels": kic_labels,
+            "kic_values": kic_values,
+            "total_employees": total_employees,
+            "registered_count": registered_count,
+            "percentage": percentage
+        })
+    except Exception as e:
+        logging.error(f"Charts data error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 # ========== ТЕСТОВЫЙ МАРШРУТ ДЛЯ SMTP ==========
 @app.route('/api/test-email')
 def test_email():

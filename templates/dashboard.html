@@ -155,7 +155,6 @@
         }
         .flatpickr-day { color: #e0e0e0 !important; }
         .flatpickr-day.selected { background: #6c5ce7 !important; border-color: #6c5ce7 !important; }
-        /* Стили для графиков */
         .charts-row {
             display: flex;
             flex-wrap: wrap;
@@ -411,6 +410,7 @@
         if (quarter) params.append('quarter', quarter);
         if (month) params.append('month', month);
         if (exactDate) params.append('exact_date', exactDate);
+        if (currentPurpose) params.append('purpose', currentPurpose);
         url += params.toString();
 
         try {
@@ -418,7 +418,8 @@
             const stats = await resp.json();
             const statCard = document.getElementById('statisticsCard');
             if (stats.total_employees > 0) {
-                document.getElementById('statText').innerHTML = `Обучено <strong>${stats.registered_unique}</strong> из <strong>${stats.total_employees}</strong> сотрудников (<strong>${stats.percentage}%</strong>)`;
+                let purposeText = currentPurpose ? ` на «${currentPurpose}»` : '';
+                document.getElementById('statText').innerHTML = `Обучено${purposeText}: <strong>${stats.registered_unique}</strong> из <strong>${stats.total_employees}</strong> сотрудников (<strong>${stats.percentage}%</strong>)`;
                 statCard.style.display = 'block';
             } else {
                 document.getElementById('statText').innerHTML = `⚠️ Нет данных о сотрудниках для выбранного подразделения.`;
@@ -534,7 +535,6 @@
             return;
         }
 
-        // 1. Столбчатая диаграмма по дням
         if (dailyChart) dailyChart.destroy();
         const ctxDaily = document.getElementById('dailyChart').getContext('2d');
         dailyChart = new Chart(ctxDaily, {
@@ -557,7 +557,6 @@
             }
         });
 
-        // 2. Круговая диаграмма по целям
         if (purposeChart) purposeChart.destroy();
         const ctxPurpose = document.getElementById('purposeChart').getContext('2d');
         purposeChart = new Chart(ctxPurpose, {
@@ -575,7 +574,6 @@
             }
         });
 
-        // 3. Горизонтальная столбчатая диаграмма (топ-10 КИЦ)
         if (kicChart) kicChart.destroy();
         const ctxKic = document.getElementById('kicChart').getContext('2d');
         kicChart = new Chart(ctxKic, {
@@ -598,7 +596,6 @@
             }
         });
 
-        // 4. Процент обученности
         const notRegistered = data.total_employees - data.registered_count;
         if (enrollmentChart) enrollmentChart.destroy();
         const ctxEnroll = document.getElementById('enrollmentChart').getContext('2d');
@@ -644,7 +641,6 @@
         loadCharts();
     }
 
-    // Обработчики кнопок цели
     document.querySelectorAll('.btn-purpose').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.btn-purpose').forEach(b => b.classList.remove('active'));

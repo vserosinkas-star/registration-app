@@ -465,6 +465,9 @@ def get_statistics():
     quarter = request.args.get('quarter')
     month = request.args.get('month')
     exact_date = request.args.get('exact_date')
+    purpose = request.args.get('purpose')
+
+    # Общее число сотрудников (без учёта цели)
     emp_query = supabase.table('employees').select('fio, tab_number, kic_pi, gosb_name')
     if gosb_name:
         emp_query = emp_query.eq('gosb_name', gosb_name)
@@ -478,11 +481,16 @@ def get_statistics():
         elif e.get('fio'):
             employee_ids.add(e['fio'].strip().lower())
     total_employees = len(employee_ids)
+
+    # Регистрации на выбранную цель (с фильтрацией по дате и цели)
     report_query = supabase.table('report').select('fio, tab_number, subdivision, timestamp, registration_id')
     if gosb_name:
         report_query = report_query.eq('gosb_name', gosb_name)
     if city:
         report_query = report_query.ilike('subdivision', f'%{city}%')
+    if purpose:
+        report_query = report_query.eq('purpose', purpose)
+
     report_res = report_query.execute()
     unique_regs = {}
     for row in report_res.data:
@@ -490,6 +498,7 @@ def get_statistics():
         if rid and rid not in unique_regs:
             unique_regs[rid] = row
     unique_regs_list = list(unique_regs.values())
+
     filtered_regs = []
     for row in unique_regs_list:
         ts = row.get('timestamp')
@@ -511,6 +520,7 @@ def get_statistics():
         if month and str(yekat_dt.month) != month:
             continue
         filtered_regs.append(row)
+
     registered_ids = set()
     for reg in filtered_regs:
         if reg.get('tab_number'):
@@ -518,11 +528,14 @@ def get_statistics():
         elif reg.get('fio'):
             registered_ids.add(reg['fio'].strip().lower())
     registered_count = len(registered_ids)
+
     percentage = (registered_count / total_employees * 100) if total_employees > 0 else 0
+
     return jsonify({
         "total_employees": total_employees,
         "registered_unique": registered_count,
-        "percentage": round(percentage, 1)
+        "percentage": round(percentage, 1),
+        "purpose": purpose or "все цели"
     })
 
 # ========== НАПОМИНАНИЯ РУКОВОДИТЕЛЯМ КИЦ ==========
@@ -790,7 +803,8 @@ def charts_data():
             "kic_values": kic_values,
             "total_employees": total_employees,
             "registered_count": registered_count,
-            "percentage": percentage
+            "percentage": percentage,
+            "purpose": purpose_filter or "все цели"
         })
     except Exception as e:
         logging.error(f"Charts data error: {e}")

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>AI Сводная панель обучения (сетка)</title>
+    <title>AI Сводная панель обучения — Процент обученности по КИЦ</title>
 
     <!-- DataTables -->
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
@@ -13,7 +13,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
@@ -201,6 +200,15 @@
             border-color: #6c5ce7;
             background: rgba(108,92,231,0.2);
         }
+        .no-data-message {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            text-align: center;
+            color: #aaa;
+            font-style: italic;
+        }
         @media (max-width: 768px) {
             body { padding: 0.5rem; }
             h1 { font-size: 1.2rem; }
@@ -216,7 +224,7 @@
 </head>
 <body>
 <div class="container">
-    <h1>🧠 Сводная панель обучения (AI Edition)</h1>
+    <h1>🧠 Сводная панель обучения — Процент обученности по КИЦ</h1>
 
     <div class="filters-card">
         <div class="filters-grid">
@@ -292,11 +300,12 @@
             <canvas id="purposeChart" width="400" height="250"></canvas>
         </div>
         <div class="chart-card">
-            <h3>Топ‑10 КИЦ</h3>
-            <canvas id="kicChart" width="400" height="250"></canvas>
+            <h3>📊 Обученность по КИЦ (проценты) — выберите ГОСБ</h3>
+            <canvas id="kicPercentChart" width="400" height="250"></canvas>
+            <div id="kicChartPlaceholder" class="no-data-message" style="display: none; height: 200px;">⬅️ Выберите ГОСБ для отображения процентов по каждому КИЦ</div>
         </div>
         <div class="chart-card">
-            <h3>Процент обученности</h3>
+            <h3>Процент обученности (общий)</h3>
             <canvas id="enrollmentChart" width="400" height="250"></canvas>
         </div>
     </div>
@@ -337,8 +346,9 @@
     let datePicker;
     let allGosb = [];
     let currentPurpose = '';
-    let dailyChart, purposeChart, kicChart, enrollmentChart;
+    let dailyChart, purposeChart, kicPercentChart, enrollmentChart;
 
+    // Функция для загрузки списка ГОСБ
     async function loadGosbList() {
         const resp = await fetch('/api/gosb-list');
         const data = await resp.json();
@@ -359,6 +369,8 @@
         if (!gosbName) {
             kicSelect.innerHTML = '<option value="">Все КИЦ</option>';
             kicSelect.disabled = true;
+            // При сбросе ГОСБ — очищаем график процентов
+            updateKicPercentChart();
             return;
         }
         const resp = await fetch(`/api/cities-by-gosb?gosb_name=${encodeURIComponent(gosbName)}`);
@@ -371,6 +383,8 @@
             kicSelect.appendChild(opt);
         });
         kicSelect.disabled = false;
+        // При смене ГОСБ обновляем график процентов
+        updateKicPercentChart();
     });
 
     function initDatePicker() {
@@ -387,6 +401,107 @@
         const parts = dateStr.split('.');
         if (parts.length !== 3) return null;
         return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+
+    // НОВЫЙ МЕТОД: загрузка процентов обученности по КИЦ для выбранного ГОСБ и фильтров
+    async function updateKicPercentChart() {
+        const gosb = document.getElementById('gosbSelect').value;
+        if (!gosb) {
+            // Если ГОСБ не выбран, скрываем canvas и показываем плейсхолдер
+            if (kicPercentChart) {
+                kicPercentChart.destroy();
+                kicPercentChart = null;
+            }
+            document.querySelector('#kicPercentChart').style.display = 'none';
+            document.getElementById('kicChartPlaceholder').style.display = 'flex';
+            return;
+        }
+
+        // Показываем canvas и прячем плейсхолдер
+        document.querySelector('#kicPercentChart').style.display = 'block';
+        document.getElementById('kicChartPlaceholder').style.display = 'none';
+
+        // Собираем все фильтры
+        const year = document.getElementById('yearFilter').value;
+        const quarter = document.getElementById('quarterFilter').value;
+        const month = document.getElementById('monthFilter').value;
+        const exactDate = formatDateForApi(document.getElementById('datePicker').value);
+        const city = document.getElementById('kicSelect').value; // может быть "Все КИЦ" или конкретный
+
+        let url = '/api/kic-percentages?';
+        const params = new URLSearchParams();
+        params.append('gosb', gosb);
+        if (city && city !== "") params.append('city', city);
+        if (year) params.append('year', year);
+        if (quarter) params.append('quarter', quarter);
+        if (month) params.append('month', month);
+        if (exactDate) params.append('exact_date', exactDate);
+        if (currentPurpose) params.append('purpose', currentPurpose);
+        url += params.toString();
+
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+            // Ожидаемый формат: { kic_names: string[], percentages: number[] }
+            if (!data.kic_names || data.kic_names.length === 0) {
+                // Нет данных для показа
+                if (kicPercentChart) {
+                    kicPercentChart.destroy();
+                    kicPercentChart = null;
+                }
+                // показать сообщение внутри canvas? проще скрыть canvas и показать текст
+                document.querySelector('#kicPercentChart').style.display = 'none';
+                document.getElementById('kicChartPlaceholder').style.display = 'flex';
+                document.getElementById('kicChartPlaceholder').innerHTML = '⚠️ Нет данных о КИЦ для выбранного ГОСБ / фильтров';
+                return;
+            }
+
+            const ctx = document.getElementById('kicPercentChart').getContext('2d');
+            if (kicPercentChart) kicPercentChart.destroy();
+            kicPercentChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.kic_names,
+                    datasets: [{
+                        label: 'Обученность (%)',
+                        data: data.percentages,
+                        backgroundColor: 'rgba(168, 237, 224, 0.7)',
+                        borderColor: '#a8ede0',
+                        borderWidth: 1,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',  // горизонтальные столбцы удобнее для названий КИЦ
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { labels: { color: '#e0e0e0' } },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `Обученность: ${ctx.raw.toFixed(1)}%`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Процент обученности (%)', color: '#c0c0e0' },
+                            ticks: { color: '#e0e0e0', callback: (val) => val + '%' },
+                            max: 100
+                        },
+                        y: {
+                            ticks: { color: '#e0e0e0', font: { size: 11 } }
+                        }
+                    }
+                }
+            });
+        } catch (err) {
+            console.error('Ошибка загрузки процентов по КИЦ:', err);
+            document.querySelector('#kicPercentChart').style.display = 'none';
+            document.getElementById('kicChartPlaceholder').style.display = 'flex';
+            document.getElementById('kicChartPlaceholder').innerHTML = '❌ Ошибка загрузки данных. Проверьте бекенд /api/kic-percentages';
+        }
     }
 
     async function loadStatistics() {
@@ -535,91 +650,32 @@
             return;
         }
 
+        // График 1: регистрации по дням
         if (dailyChart) dailyChart.destroy();
         const ctxDaily = document.getElementById('dailyChart').getContext('2d');
         dailyChart = new Chart(ctxDaily, {
             type: 'bar',
-            data: {
-                labels: data.days,
-                datasets: [{
-                    label: 'Регистрации',
-                    data: data.daily_counts,
-                    backgroundColor: 'rgba(108, 92, 231, 0.6)',
-                    borderColor: '#6c5ce7',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: { legend: { labels: { color: '#e0e0e0' } } },
-                scales: { x: { ticks: { color: '#e0e0e0', maxRotation: 45 } }, y: { ticks: { color: '#e0e0e0' } } }
-            }
+            data: { labels: data.days, datasets: [{ label: 'Регистрации', data: data.daily_counts, backgroundColor: 'rgba(108, 92, 231, 0.6)', borderColor: '#6c5ce7', borderWidth: 1 }] },
+            options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#e0e0e0' } } }, scales: { x: { ticks: { color: '#e0e0e0', maxRotation: 45 } }, y: { ticks: { color: '#e0e0e0' } } } }
         });
 
+        // График 2: распределение по целям
         if (purposeChart) purposeChart.destroy();
         const ctxPurpose = document.getElementById('purposeChart').getContext('2d');
         purposeChart = new Chart(ctxPurpose, {
             type: 'pie',
-            data: {
-                labels: data.purposes,
-                datasets: [{
-                    data: data.purpose_counts,
-                    backgroundColor: ['#6c5ce7', '#a463f5', '#fed6e3', '#a8ede0', '#ff9f43']
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: { legend: { position: 'bottom', labels: { color: '#e0e0e0' } } }
-            }
+            data: { labels: data.purposes, datasets: [{ data: data.purpose_counts, backgroundColor: ['#6c5ce7', '#a463f5', '#fed6e3', '#a8ede0', '#ff9f43'] }] },
+            options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#e0e0e0' } } } }
         });
 
-        if (kicChart) kicChart.destroy();
-        const ctxKic = document.getElementById('kicChart').getContext('2d');
-        kicChart = new Chart(ctxKic, {
-            type: 'bar',
-            data: {
-                labels: data.kic_labels,
-                datasets: [{
-                    label: 'Кол-во регистраций',
-                    data: data.kic_values,
-                    backgroundColor: 'rgba(168, 237, 224, 0.6)',
-                    borderColor: '#a8ede0',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                indexAxis: 'y',
-                responsive: true,
-                plugins: { legend: { labels: { color: '#e0e0e0' } } },
-                scales: { x: { ticks: { color: '#e0e0e0' } }, y: { ticks: { color: '#e0e0e0' } } }
-            }
-        });
-
+        // График 4: общий процент обученности
         const notRegistered = data.total_employees - data.registered_count;
         if (enrollmentChart) enrollmentChart.destroy();
         const ctxEnroll = document.getElementById('enrollmentChart').getContext('2d');
         enrollmentChart = new Chart(ctxEnroll, {
             type: 'doughnut',
-            data: {
-                labels: ['Зарегистрированы', 'Не зарегистрированы'],
-                datasets: [{
-                    data: [data.registered_count, notRegistered],
-                    backgroundColor: ['#6c5ce7', '#2d2d4a'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: { position: 'bottom', labels: { color: '#e0e0e0' } },
-                    tooltip: {
-                        callbacks: {
-                            label: (ctx) => `${ctx.label}: ${ctx.raw} чел. (${((ctx.raw / data.total_employees) * 100).toFixed(1)}%)`
-                        }
-                    }
-                }
-            }
+            data: { labels: ['Зарегистрированы', 'Не зарегистрированы'], datasets: [{ data: [data.registered_count, notRegistered], backgroundColor: ['#6c5ce7', '#2d2d4a'], borderWidth: 0 }] },
+            options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#e0e0e0' } }, tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw} чел. (${((ctx.raw / data.total_employees) * 100).toFixed(1)}%)` } } } }
         });
     }
 
@@ -632,13 +688,14 @@
         document.getElementById('quarterFilter').value = '';
         document.getElementById('monthFilter').value = '';
         if (datePicker) datePicker.clear();
-        // Сбросить кнопки цели
         document.querySelectorAll('.btn-purpose').forEach(btn => btn.classList.remove('active'));
         document.querySelector('.btn-purpose[data-purpose=""]').classList.add('active');
         currentPurpose = '';
+        // После сброса обновить все
         loadTableData();
         loadStatistics();
         loadCharts();
+        updateKicPercentChart(); // перерисовка процентов по КИЦ
     }
 
     document.querySelectorAll('.btn-purpose').forEach(btn => {
@@ -649,104 +706,55 @@
             loadTableData();
             loadStatistics();
             loadCharts();
+            updateKicPercentChart();
         });
     });
 
+    document.getElementById('applyFilters').addEventListener('click', () => {
+        loadTableData();
+        loadStatistics();
+        loadCharts();
+        updateKicPercentChart();
+    });
+    document.getElementById('resetFilters').addEventListener('click', resetFilters);
     document.getElementById('refreshBtn').addEventListener('click', () => {
         loadTableData();
         loadStatistics();
         loadCharts();
+        updateKicPercentChart();
     });
 
     document.getElementById('sendTelegramBtn').addEventListener('click', async function() {
-        const btn = this;
-        btn.disabled = true;
-        btn.textContent = '⏳ Отправка...';
+        const btn = this; btn.disabled = true; btn.textContent = '⏳ Отправка...';
         try {
-            const resp = await fetch('/api/send-today-reports', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            });
+            const resp = await fetch('/api/send-today-reports', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
             const result = await resp.json();
-            if (result.status === 'ok') {
-                alert(`Отчёты отправлены в ${result.sent} чатов`);
-            } else {
-                alert('Ошибка: ' + (result.message || 'неизвестная ошибка'));
-            }
-        } catch (err) {
-            alert('Ошибка соединения: ' + err.message);
-        } finally {
-            btn.disabled = false;
-            btn.textContent = '📨 Отправить в СберЧат';
-        }
+            alert(result.status === 'ok' ? `Отчёты отправлены в ${result.sent} чатов` : 'Ошибка: ' + (result.message || 'неизвестная ошибка'));
+        } catch (err) { alert('Ошибка соединения: ' + err.message); }
+        finally { btn.disabled = false; btn.textContent = '📨 Отправить в СберЧат'; }
     });
 
     document.getElementById('exportExcelBtn').addEventListener('click', async function() {
         const filteredData = table.rows({ search: 'applied' }).data().toArray();
-        if (filteredData.length === 0) {
-            alert('Нет данных для выгрузки');
-            return;
-        }
-        const btn = this;
-        btn.disabled = true;
-        btn.textContent = '⏳ Создание...';
+        if (filteredData.length === 0) { alert('Нет данных для выгрузки'); return; }
+        const btn = this; btn.disabled = true; btn.textContent = '⏳ Создание...';
         try {
-            const resp = await fetch('/api/export-excel', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ data: filteredData })
-            });
+            const resp = await fetch('/api/export-excel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: filteredData }) });
             if (resp.ok) {
-                const blob = await resp.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `report_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.xlsx`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window.URL.revokeObjectURL(url);
-            } else {
-                const err = await resp.json();
-                alert('Ошибка при создании файла: ' + (err.message || 'неизвестная ошибка'));
-            }
-        } catch (err) {
-            alert('Ошибка соединения: ' + err.message);
-        } finally {
-            btn.disabled = false;
-            btn.textContent = '📊 Выгрузить в Excel';
-        }
+                const blob = await resp.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `report_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.xlsx`; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url);
+            } else { const err = await resp.json(); alert('Ошибка: ' + (err.message || 'неизвестная ошибка')); }
+        } catch (err) { alert('Ошибка соединения: ' + err.message); }
+        finally { btn.disabled = false; btn.textContent = '📊 Выгрузить в Excel'; }
     });
 
     document.getElementById('remindKicBtn').addEventListener('click', async function() {
-        const days = 30;
-        const purpose = '';
-        const btn = this;
-        btn.disabled = true;
-        btn.textContent = '⏳ Отправка...';
+        const btn = this; btn.disabled = true; btn.textContent = '⏳ Отправка...';
         try {
-            const resp = await fetch('/api/send-kic-reminders', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ days, purpose })
-            });
+            const resp = await fetch('/api/send-kic-reminders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ days: 30, purpose: '' }) });
             const result = await resp.json();
-            if (result.status === 'ok') {
-                let msg = 'Напоминания отправлены:\n';
-                result.results.forEach(r => {
-                    if (r.error) msg += `${r.kic}: ${r.error}\n`;
-                    else msg += `${r.kic}: ${r.sent} сотрудников -> ${r.to}\n`;
-                });
-                alert(msg);
-            } else {
-                alert('Ошибка: ' + (result.message || 'неизвестная ошибка'));
-            }
-        } catch (err) {
-            alert('Ошибка соединения: ' + err.message);
-        } finally {
-            btn.disabled = false;
-            btn.textContent = '📧 Напомнить руководителям КИЦ';
-        }
+            if (result.status === 'ok') { let msg = 'Напоминания отправлены:\n'; result.results.forEach(r => { msg += `${r.kic}: ${r.error || `отправлено ${r.sent} сотрудникам → ${r.to}`}\n`; }); alert(msg); } else { alert('Ошибка: ' + (result.message || 'неизвестная ошибка')); }
+        } catch (err) { alert('Ошибка соединения: ' + err.message); }
+        finally { btn.disabled = false; btn.textContent = '📧 Напомнить руководителям КИЦ'; }
     });
 
     window.onload = async () => {
@@ -755,14 +763,7 @@
         await loadTableData();
         await loadStatistics();
         await loadCharts();
-        document.getElementById('applyFilters').addEventListener('click', () => {
-            loadTableData();
-            loadStatistics();
-            loadCharts();
-        });
-        document.getElementById('resetFilters').addEventListener('click', () => {
-            resetFilters();
-        });
+        await updateKicPercentChart();
     };
 </script>
 </body>

@@ -538,6 +538,145 @@ def get_statistics():
         "purpose": purpose or "все цели"
     })
 
+# ========== НОВЫЙ ЭНДПОИНТ: ПРОЦЕНТЫ ОБУЧЕННОСТИ ПО КИЦ ==========
+@app.route('/api/kic-percentages')
+def kic_percentages():
+    """Возвращает процент обученности по каждому КИЦ в выбранном ГОСБ с учётом фильтров."""
+    if not supabase:
+        return jsonify({"error": "База данных не инициализирована"}), 500
+
+    gosb = request.args.get('gosb')
+    if not gosb:
+        return jsonify({"error": "Не указан ГОСБ"}), 400
+
+    city_filter = request.args.get('city')          # конкретный КИЦ (опционально)
+    year = request.args.get('year')
+    quarter = request.args.get('quarter')
+    month = request.args.get('month')
+    exact_date = request.args.get('exact_date')
+    purpose = request.args.get('purpose')
+
+    # 1. Получаем список всех КИЦ (городов) внутри выбранного ГОСБ из таблицы cities
+    try:
+        gosb_id_res = supabase.table('gosb').select('id').eq('name', gosb).execute()
+        if not gosb_id_res.data:
+            return jsonify({"kic_names": [], "percentages": []})
+        gosb_id = gosb_id_res.data[0]['id']
+        cities_res = supabase.table('cities').select('name').eq('gosb_id', gosb_id).execute()
+        all_kic_names = [c['name'] for c in cities_res.data]
+    except Exception as e:
+        logging.error(f"Ошибка получения списка КИЦ: {e}")
+        # fallback: извлечь уникальные kic_pi из employees
+        try:
+            emp_kic = supabase.table('employees').select('kic_pi').eq('gosb_name', gosb).execute()
+            all_kic_names = list({kic for row in emp_kic.data if (kic := row.get('kic_pi'))})
+        except:
+            all_kic_names = []
+
+    if not all_kic_names:
+        return jsonify({"kic_names": [], "percentages": []})
+
+    # 2. Получаем всех сотрудников выбранного ГОСБ
+    emp_query = supabase.table('employees').select('tab_number, fio, kic_pi').eq('gosb_name', gosb)
+    if city_filter:
+        emp_query = emp_query.ilike('kic_pi', f'%{city_filter}%')
+    emp_res = emp_query.execute()
+    employees_by_kic = {kic: [] for kic in all_kic_names}
+    employees_by_kic['Другие'] = []
+
+    for emp in emp_res.data:
+        kic_field = (emp.get('kic_pi') or '').strip()
+        matched = False
+        for kic in all_kic_names:
+            if kic.lower() in kic_field.lower():
+                employees_by_kic[kic].append(emp)
+                matched = True
+                break
+        if not matched:
+            employees_by_kic['Другие'].append(emp)
+
+    # 3. Получаем регистрации из report
+    report_query = supabase.table('report').select('tab_number, fio, subdivision, timestamp, registration_id').eq('gosb_name', gosb)
+    if purpose:
+        report_query = report_query.eq('purpose', purpose)
+    if city_filter:
+        report_query = report_query.ilike('subdivision', f'%{city_filter}%')
+    report_res = report_query.execute()
+
+    unique_reports = {}
+    for row in report_res.data:
+        rid = row.get('registration_id')
+        if rid and rid not in unique_reports:
+            unique_reports[rid] = row
+    reports = list(unique_reports.values())
+
+    # Фильтрация по дате
+    filtered_reports = []
+    for row in reports:
+        ts = row.get('timestamp')
+        if not ts:
+            continue
+        try:
+            utc_dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+            yekat_dt = utc_dt.replace(tzinfo=pytz.UTC).astimezone(YEKAT_TIMEZONE)
+        except Exception:
+            continue
+        if exact_date and yekat_dt.date().isoformat() != exact_date:
+            continue
+        if year and str(yekat_dt.year) != year:
+            continue
+        if quarter:
+            q = (yekat_dt.month - 1) // 3 + 1
+            if str(q) != quarter:
+                continue
+        if month and str(yekat_dt.month) != month:
+            continue
+        filtered_reports.append(row)
+
+    registered_tab = set()
+    registered_fio = set()
+    for reg in filtered_reports:
+        if reg.get('tab_number'):
+            registered_tab.add(reg['tab_number'])
+        if reg.get('fio'):
+            registered_fio.add(reg['fio'].strip().lower())
+
+    # 4. Считаем проценты для каждого КИЦ
+    result_kics = []
+    result_percents = []
+    kic_list = [k for k in all_kic_names if employees_by_kic.get(k)]
+    if employees_by_kic.get('Другие'):
+        kic_list.append('Другие')
+
+    for kic in kic_list:
+        employees = employees_by_kic.get(kic, [])
+        total = len(employees)
+        if total == 0:
+            result_kics.append(kic)
+            result_percents.append(0)
+            continue
+        registered_cnt = 0
+        for emp in employees:
+            tab = emp.get('tab_number')
+            fio = emp.get('fio', '').strip().lower()
+            if (tab and tab in registered_tab) or (fio and fio in registered_fio):
+                registered_cnt += 1
+        percent = round((registered_cnt / total) * 100, 1)
+        result_kics.append(kic)
+        result_percents.append(percent)
+
+    # Убираем КИЦ с нулевым количеством сотрудников
+    filtered = [(k, p) for k, p in zip(result_kics, result_percents) if employees_by_kic.get(k, [])]
+    if filtered:
+        result_kics, result_percents = zip(*filtered)
+    else:
+        result_kics, result_percents = [], []
+
+    return jsonify({
+        "kic_names": result_kics,
+        "percentages": result_percents
+    })
+
 # ========== НАПОМИНАНИЯ РУКОВОДИТЕЛЯМ КИЦ ==========
 @app.route('/api/send-kic-reminders', methods=['POST'])
 def send_kic_reminders():

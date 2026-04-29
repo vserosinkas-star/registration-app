@@ -13,8 +13,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <!-- Плагин для отображения значений на столбцах -->
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
@@ -350,7 +348,6 @@
     let currentPurpose = '';
     let dailyChart, purposeChart, kicPercentChart, enrollmentChart;
 
-    // Функция для загрузки списка ГОСБ
     async function loadGosbList() {
         const resp = await fetch('/api/gosb-list');
         const data = await resp.json();
@@ -403,6 +400,7 @@
         return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
 
+    // Функция отрисовки графика с процентами на столбцах
     async function updateKicPercentChart() {
         const gosb = document.getElementById('gosbSelect').value;
         if (!gosb) {
@@ -446,6 +444,8 @@
 
             const ctx = document.getElementById('kicPercentChart').getContext('2d');
             if (kicPercentChart) kicPercentChart.destroy();
+
+            // Создаём график с кастомной отрисовкой подписей
             kicPercentChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
@@ -469,17 +469,6 @@
                             callbacks: {
                                 label: (ctx) => `Обученность: ${ctx.raw.toFixed(1)}%`
                             }
-                        },
-                        datalabels: {
-                            anchor: 'end',
-                            align: 'end',
-                            offset: 4,
-                            color: '#e0e0e0',
-                            backgroundColor: 'rgba(0,0,0,0.5)',
-                            borderRadius: 4,
-                            padding: { left: 4, right: 4, top: 2, bottom: 2 },
-                            font: { weight: 'bold', size: 12 },
-                            formatter: (value) => `${value}%`
                         }
                     },
                     scales: {
@@ -491,9 +480,44 @@
                         y: {
                             ticks: { color: '#e0e0e0', font: { size: 11 } }
                         }
+                    },
+                    layout: {
+                        padding: {
+                            right: 30   // место для подписей справа от столбцов
+                        }
                     }
                 }
             });
+
+            // Дополнительная ручная отрисовка процентов на столбцах
+            const originalDraw = kicPercentChart.draw;
+            kicPercentChart.draw = function() {
+                originalDraw.apply(this, arguments);
+                const ctx = this.ctx;
+                const yAxis = this.scales.y;
+                const xAxis = this.scales.x;
+                const dataset = this.data.datasets[0];
+                const bars = this.getDatasetMeta(0).data;
+
+                ctx.save();
+                ctx.font = 'bold 12px Inter, sans-serif';
+                ctx.fillStyle = '#e0e0e0';
+                ctx.shadowBlur = 0;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+
+                bars.forEach((bar, i) => {
+                    const value = dataset.data[i];
+                    if (value === undefined || value === null) return;
+                    const xPos = bar.x + bar.width;  // правый край столбца
+                    const yPos = bar.y;
+                    ctx.fillStyle = '#e0e0e0';
+                    ctx.fillText(`${value}%`, xPos + 5, yPos);
+                });
+                ctx.restore();
+            };
+            kicPercentChart.draw();
+
         } catch (err) {
             console.error('Ошибка загрузки процентов по КИЦ:', err);
             document.querySelector('#kicPercentChart').style.display = 'none';

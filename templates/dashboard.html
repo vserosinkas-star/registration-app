@@ -176,6 +176,12 @@
             margin-bottom: 1rem;
             text-align: center;
         }
+        /* Фиксируем высоту контейнера для графика процентов, чтобы строки не сжимались */
+        .kic-chart-container {
+            position: relative;
+            height: auto;
+            min-height: 400px;
+        }
         .purpose-buttons {
             display: flex;
             flex-wrap: wrap;
@@ -301,7 +307,9 @@
         </div>
         <div class="chart-card">
             <h3>📊 Обученность по КИЦ (проценты) — выберите ГОСБ</h3>
-            <canvas id="kicPercentChart" width="400" height="250"></canvas>
+            <div class="kic-chart-container">
+                <canvas id="kicPercentChart" width="400" height="400"></canvas>
+            </div>
             <div id="kicChartPlaceholder" class="no-data-message" style="display: none; height: 200px;">⬅️ Выберите ГОСБ для отображения процентов по каждому КИЦ</div>
         </div>
         <div class="chart-card">
@@ -400,7 +408,7 @@
         return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
 
-    // Функция отрисовки графика с процентами на столбцах
+    // Отрисовка графика с процентами ВНУТРИ столбцов и увеличенным расстоянием между строками
     async function updateKicPercentChart() {
         const gosb = document.getElementById('gosbSelect').value;
         if (!gosb) {
@@ -442,10 +450,16 @@
                 return;
             }
 
-            const ctx = document.getElementById('kicPercentChart').getContext('2d');
+            const canvas = document.getElementById('kicPercentChart');
+            const ctx = canvas.getContext('2d');
             if (kicPercentChart) kicPercentChart.destroy();
 
-            // Создаём график с кастомной отрисовкой подписей
+            // Рассчитываем высоту canvas'а в зависимости от количества КИЦ (минимум 400, плюс по 40px на каждую строку после 5)
+            const categoriesCount = data.kic_names.length;
+            const dynamicHeight = Math.max(400, categoriesCount * 48);
+            canvas.height = dynamicHeight;
+            canvas.style.height = `${dynamicHeight}px`;
+
             kicPercentChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
@@ -456,13 +470,15 @@
                         backgroundColor: 'rgba(168, 237, 224, 0.7)',
                         borderColor: '#a8ede0',
                         borderWidth: 1,
-                        borderRadius: 8
+                        borderRadius: 6,
+                        barPercentage: 0.65,     // Уменьшаем ширину столбца → увеличиваем расстояние между строками
+                        categoryPercentage: 0.8
                     }]
                 },
                 options: {
                     indexAxis: 'y',
                     responsive: true,
-                    maintainAspectRatio: true,
+                    maintainAspectRatio: false,   // важно для динамической высоты
                     plugins: {
                         legend: { labels: { color: '#e0e0e0' } },
                         tooltip: {
@@ -478,41 +494,43 @@
                             max: 100
                         },
                         y: {
-                            ticks: { color: '#e0e0e0', font: { size: 11 } }
+                            ticks: { color: '#e0e0e0', font: { size: 12 } },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
                         }
                     },
                     layout: {
                         padding: {
-                            right: 30   // место для подписей справа от столбцов
+                            right: 10,
+                            left: 10
                         }
                     }
                 }
             });
 
-            // Дополнительная ручная отрисовка процентов на столбцах
+            // Ручная отрисовка процентов ПО ЦЕНТРУ каждого столбца
             const originalDraw = kicPercentChart.draw;
             kicPercentChart.draw = function() {
                 originalDraw.apply(this, arguments);
                 const ctx = this.ctx;
-                const yAxis = this.scales.y;
-                const xAxis = this.scales.x;
-                const dataset = this.data.datasets[0];
                 const bars = this.getDatasetMeta(0).data;
+                const dataset = this.data.datasets[0];
 
                 ctx.save();
-                ctx.font = 'bold 12px Inter, sans-serif';
-                ctx.fillStyle = '#e0e0e0';
+                ctx.font = 'bold 13px "Inter", sans-serif';
                 ctx.shadowBlur = 0;
-                ctx.textAlign = 'left';
+                ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
 
                 bars.forEach((bar, i) => {
                     const value = dataset.data[i];
                     if (value === undefined || value === null) return;
-                    const xPos = bar.x + bar.width;  // правый край столбца
+                    // Центр столбца по X (начало + половина ширины)
+                    const xPos = bar.x + bar.width / 2;
                     const yPos = bar.y;
-                    ctx.fillStyle = '#e0e0e0';
-                    ctx.fillText(`${value}%`, xPos + 5, yPos);
+                    // Контрастный фон под текстом, если нужно
+                    ctx.fillStyle = '#ffffff';
+                    ctx.shadowBlur = 0;
+                    ctx.fillText(`${value}%`, xPos, yPos);
                 });
                 ctx.restore();
             };

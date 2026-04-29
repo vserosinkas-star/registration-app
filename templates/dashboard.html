@@ -40,7 +40,7 @@
             backdrop-filter: blur(10px);
         }
         h1 {
-            font-size: 2.5rem; font-weight: 700; margin-bottom: 1.5rem;
+            font-size: 2.5rem; font-weight: 700; margin-bottom: 1rem;
             background: linear-gradient(90deg, #a8ede0, #fed6e3);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
             text-shadow: 0 0 20px rgba(168, 237, 224, 0.3);
@@ -176,10 +176,64 @@
             margin-bottom: 1rem;
             text-align: center;
         }
-        .kic-chart-container {
+        .kic-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 0.5rem;
+        }
+        .kic-table tr {
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .kic-table td {
+            padding: 10px 8px;
+            vertical-align: middle;
+        }
+        .kic-name {
+            font-weight: 500;
+            white-space: nowrap;
+            width: 1%;
+        }
+        .progress-container {
+            background-color: rgba(0,0,0,0.3);
+            border-radius: 20px;
+            height: 32px;
             position: relative;
-            height: auto;
-            min-height: 400px;
+            width: 100%;
+            overflow: hidden;
+        }
+        .progress-bar {
+            background: linear-gradient(90deg, #6c5ce7, #a8ede0);
+            border-radius: 20px;
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            padding-left: 12px;
+            color: white;
+            font-weight: bold;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+        .progress-value {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            padding-left: 12px;
+            font-weight: bold;
+            font-size: 13px;
+            color: white;
+            text-shadow: 0 0 3px black;
+            pointer-events: none;
+            z-index: 2;
+        }
+        .percent-number {
+            margin-left: 8px;
+            font-weight: 600;
         }
         .purpose-buttons {
             display: flex;
@@ -224,6 +278,8 @@
             .btn { padding: 0.3rem 0.8rem; font-size: 0.7rem; }
             #dataTable { font-size: 0.7rem; }
             #dataTable th, #dataTable td { padding: 0.3rem; }
+            .kic-name { font-size: 0.8rem; }
+            .progress-bar { font-size: 11px; padding-left: 6px; }
         }
     </style>
 </head>
@@ -305,11 +361,13 @@
             <canvas id="purposeChart" width="400" height="250"></canvas>
         </div>
         <div class="chart-card">
-            <h3>📊 Обученность по КИЦ (проценты) — выберите ГОСБ</h3>
-            <div class="kic-chart-container">
-                <canvas id="kicPercentChart" width="400" height="400"></canvas>
+            <h3>📊 Обученность по КИЦ (проценты)</h3>
+            <div id="kicTableContainer" style="min-height: 300px;">
+                <table class="kic-table" id="kicTable">
+                    <tbody></tbody>
+                </table>
+                <div id="kicTablePlaceholder" class="no-data-message" style="display: none;">⬅️ Выберите ГОСБ для отображения процентов по каждому КИЦ</div>
             </div>
-            <div id="kicChartPlaceholder" class="no-data-message" style="display: none; height: 200px;">⬅️ Выберите ГОСБ для отображения процентов по каждому КИЦ</div>
         </div>
         <div class="chart-card">
             <h3>Процент обученности (общий)</h3>
@@ -342,7 +400,7 @@
                     <th><input type="text" placeholder="Радиосвязь"></th><th><input type="text" placeholder="Учения"></th>
                     <th><input type="text" placeholder="Контравар."></th><th><input type="text" placeholder="Модуль 1"></th>
                     <th><input type="text" placeholder="ЕПП"></th>
-                </td>
+                </tr>
             </tfoot>
         </table>
     </div>
@@ -353,7 +411,7 @@
     let datePicker;
     let allGosb = [];
     let currentPurpose = '';
-    let dailyChart, purposeChart, kicPercentChart, enrollmentChart;
+    let dailyChart, purposeChart, enrollmentChart;
 
     async function loadGosbList() {
         const resp = await fetch('/api/gosb-list');
@@ -375,7 +433,7 @@
         if (!gosbName) {
             kicSelect.innerHTML = '<option value="">Все КИЦ</option>';
             kicSelect.disabled = true;
-            updateKicPercentChart();
+            updateKicTable();
             return;
         }
         const resp = await fetch(`/api/cities-by-gosb?gosb_name=${encodeURIComponent(gosbName)}`);
@@ -388,7 +446,7 @@
             kicSelect.appendChild(opt);
         });
         kicSelect.disabled = false;
-        updateKicPercentChart();
+        updateKicTable();
     });
 
     function initDatePicker() {
@@ -407,18 +465,17 @@
         return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
 
-    // Отрисовка графика с процентами ВНУТРИ столбцов (гарантированно видимыми)
-    async function updateKicPercentChart() {
+    // Обновление таблицы с процентами по КИЦ (вместо графика)
+    async function updateKicTable() {
         const gosb = document.getElementById('gosbSelect').value;
         if (!gosb) {
-            if (kicPercentChart) { kicPercentChart.destroy(); kicPercentChart = null; }
-            document.querySelector('#kicPercentChart').style.display = 'none';
-            document.getElementById('kicChartPlaceholder').style.display = 'flex';
+            document.getElementById('kicTable').style.display = 'none';
+            document.getElementById('kicTablePlaceholder').style.display = 'flex';
             return;
         }
 
-        document.querySelector('#kicPercentChart').style.display = 'block';
-        document.getElementById('kicChartPlaceholder').style.display = 'none';
+        document.getElementById('kicTable').style.display = 'table';
+        document.getElementById('kicTablePlaceholder').style.display = 'none';
 
         const year = document.getElementById('yearFilter').value;
         const quarter = document.getElementById('quarterFilter').value;
@@ -441,107 +498,53 @@
             const resp = await fetch(url);
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const data = await resp.json();
+            const tbody = document.querySelector('#kicTable tbody');
+            tbody.innerHTML = '';
+
             if (!data.kic_names || data.kic_names.length === 0) {
-                if (kicPercentChart) { kicPercentChart.destroy(); kicPercentChart = null; }
-                document.querySelector('#kicPercentChart').style.display = 'none';
-                document.getElementById('kicChartPlaceholder').style.display = 'flex';
-                document.getElementById('kicChartPlaceholder').innerHTML = '⚠️ Нет данных о КИЦ для выбранного ГОСБ / фильтров';
+                document.getElementById('kicTable').style.display = 'none';
+                document.getElementById('kicTablePlaceholder').style.display = 'flex';
+                document.getElementById('kicTablePlaceholder').innerHTML = '⚠️ Нет данных о КИЦ для выбранного ГОСБ / фильтров';
                 return;
             }
 
-            const canvas = document.getElementById('kicPercentChart');
-            const ctx = canvas.getContext('2d');
-            if (kicPercentChart) kicPercentChart.destroy();
-
-            // Динамическая высота
-            const categoriesCount = data.kic_names.length;
-            const dynamicHeight = Math.max(400, categoriesCount * 52);
-            canvas.height = dynamicHeight;
-            canvas.style.height = `${dynamicHeight}px`;
-
-            kicPercentChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: data.kic_names,
-                    datasets: [{
-                        label: 'Обученность (%)',
-                        data: data.percentages,
-                        backgroundColor: 'rgba(168, 237, 224, 0.85)',
-                        borderColor: '#a8ede0',
-                        borderWidth: 1,
-                        borderRadius: 6,
-                        barPercentage: 0.65,
-                        categoryPercentage: 0.8
-                    }]
-                },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { labels: { color: '#e0e0e0' } },
-                        tooltip: {
-                            callbacks: {
-                                label: (ctx) => `Обученность: ${ctx.raw.toFixed(1)}%`
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            title: { display: true, text: 'Процент обученности (%)', color: '#c0c0e0' },
-                            ticks: { color: '#e0e0e0', callback: (val) => val + '%' },
-                            max: 100
-                        },
-                        y: {
-                            ticks: { color: '#e0e0e0', font: { size: 12, weight: '500' } },
-                            grid: { color: 'rgba(255,255,255,0.1)' }
-                        }
-                    },
-                    layout: {
-                        padding: { right: 10, left: 10 }
-                    }
+            for (let i = 0; i < data.kic_names.length; i++) {
+                const name = data.kic_names[i];
+                const percent = data.percentages[i];
+                const row = tbody.insertRow();
+                const cellName = row.insertCell(0);
+                const cellBar = row.insertCell(1);
+                cellName.className = 'kic-name';
+                cellName.textContent = name;
+                cellBar.style.width = '100%';
+                
+                const container = document.createElement('div');
+                container.className = 'progress-container';
+                const bar = document.createElement('div');
+                bar.className = 'progress-bar';
+                bar.style.width = `${percent}%`;
+                // Текст внутри прогресс-бара (будет виден только если достаточно места)
+                bar.textContent = percent >= 25 ? `${percent}%` : '';
+                // Дополнительный элемент для отображения процента в любом случае (слева)
+                const valueSpan = document.createElement('div');
+                valueSpan.className = 'progress-value';
+                valueSpan.textContent = `${percent}%`;
+                if (percent <= 20) {
+                    valueSpan.style.color = '#e0e0e0';
+                    valueSpan.style.textShadow = 'none';
+                } else {
+                    valueSpan.style.display = 'none'; // если процент большой, показываем внутри бара
                 }
-            });
-
-            // Кастомная отрисовка процентов ПОВЕРХ столбцов с высокой контрастностью
-            const originalDraw = kicPercentChart.draw;
-            kicPercentChart.draw = function() {
-                originalDraw.apply(this, arguments);
-                const ctx = this.ctx;
-                const bars = this.getDatasetMeta(0).data;
-                const dataset = this.data.datasets[0];
-
-                ctx.save();
-                ctx.font = 'bold 14px "Inter", sans-serif';
-                ctx.shadowBlur = 0;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-
-                bars.forEach((bar, i) => {
-                    const value = dataset.data[i];
-                    if (value === undefined || value === null) return;
-                    const xPos = bar.x + bar.width / 2;
-                    const yPos = bar.y;
-
-                    // Рисуем белую обводку вокруг текста для лучшей читаемости
-                    ctx.shadowBlur = 0;
-                    ctx.lineWidth = 2;
-                    ctx.strokeStyle = '#000000';
-                    ctx.fillStyle = '#ffffff';
-                    // Обводка (чёрная)
-                    ctx.strokeText(`${value}%`, xPos, yPos);
-                    // Заливка (белая)
-                    ctx.fillText(`${value}%`, xPos, yPos);
-                });
-                ctx.restore();
-            };
-            kicPercentChart.draw();
-
+                if (percent > 25) bar.style.paddingLeft = '12px';
+                container.appendChild(bar);
+                container.appendChild(valueSpan);
+                cellBar.appendChild(container);
+            }
         } catch (err) {
             console.error('Ошибка загрузки процентов по КИЦ:', err);
-            document.querySelector('#kicPercentChart').style.display = 'none';
-            document.getElementById('kicChartPlaceholder').style.display = 'flex';
-            document.getElementById('kicChartPlaceholder').innerHTML = '❌ Ошибка загрузки данных. Проверьте бекенд /api/kic-percentages';
+            document.getElementById('kicTable').style.display = 'none';
+            document.getElementById('kicTablePlaceholder').style.display = 'flex';
+            document.getElementById('kicTablePlaceholder').innerHTML = '❌ Ошибка загрузки данных. Проверьте бекенд /api/kic-percentages';
         }
     }
 
@@ -732,7 +735,7 @@
         loadTableData();
         loadStatistics();
         loadCharts();
-        updateKicPercentChart();
+        updateKicTable();
     }
 
     document.querySelectorAll('.btn-purpose').forEach(btn => {
@@ -743,7 +746,7 @@
             loadTableData();
             loadStatistics();
             loadCharts();
-            updateKicPercentChart();
+            updateKicTable();
         });
     });
 
@@ -751,14 +754,14 @@
         loadTableData();
         loadStatistics();
         loadCharts();
-        updateKicPercentChart();
+        updateKicTable();
     });
     document.getElementById('resetFilters').addEventListener('click', resetFilters);
     document.getElementById('refreshBtn').addEventListener('click', () => {
         loadTableData();
         loadStatistics();
         loadCharts();
-        updateKicPercentChart();
+        updateKicTable();
     });
 
     document.getElementById('sendTelegramBtn').addEventListener('click', async function() {
@@ -800,7 +803,7 @@
         await loadTableData();
         await loadStatistics();
         await loadCharts();
-        await updateKicPercentChart();
+        await updateKicTable();
     };
 </script>
 </body>

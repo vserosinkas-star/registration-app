@@ -465,7 +465,7 @@
         return `${parts[2]}-${parts[1]}-${parts[0]}`;
     }
 
-    // Обновление таблицы с процентами по КИЦ (вместо графика)
+    // Функция обновления таблицы с процентами (скрывает "Другие" с 0%)
     async function updateKicTable() {
         const gosb = document.getElementById('gosbSelect').value;
         if (!gosb) {
@@ -511,6 +511,10 @@
             for (let i = 0; i < data.kic_names.length; i++) {
                 const name = data.kic_names[i];
                 const percent = data.percentages[i];
+                
+                // ⭐ Скрываем строку "Другие", если процент равен 0
+                if (name === 'Другие' && percent === 0) continue;
+
                 const row = tbody.insertRow();
                 const cellName = row.insertCell(0);
                 const cellBar = row.insertCell(1);
@@ -529,16 +533,23 @@
                 const valueSpan = document.createElement('div');
                 valueSpan.className = 'progress-value';
                 valueSpan.textContent = `${percent}%`;
-                if (percent <= 20) {
+                if (percent > 20) {
+                    valueSpan.style.display = 'none'; // скрываем, если процент большой – и так видно внутри бара
+                } else {
                     valueSpan.style.color = '#e0e0e0';
                     valueSpan.style.textShadow = 'none';
-                } else {
-                    valueSpan.style.display = 'none'; // если процент большой, показываем внутри бара
                 }
                 if (percent > 25) bar.style.paddingLeft = '12px';
                 container.appendChild(bar);
                 container.appendChild(valueSpan);
                 cellBar.appendChild(container);
+            }
+
+            // Если после фильтрации не осталось строк, показываем заглушку
+            if (tbody.rows.length === 0) {
+                document.getElementById('kicTable').style.display = 'none';
+                document.getElementById('kicTablePlaceholder').style.display = 'flex';
+                document.getElementById('kicTablePlaceholder').innerHTML = '⚠️ Нет данных для отображения (все КИЦ имеют 0%)';
             }
         } catch (err) {
             console.error('Ошибка загрузки процентов по КИЦ:', err);

@@ -10,8 +10,6 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <!-- Плагин для отображения процентов на круговых диаграммах -->
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0/dist/chartjs-plugin-datalabels.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
@@ -252,7 +250,7 @@
             body { padding: 0.5rem; }
             h1 { font-size: 1.2rem; }
             .filters-card { padding: 0.75rem; }
-            .filters-grid { display: grid; grid-column: 1fr 1fr; gap: 0.5rem; }
+            .filters-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
             .filter-item { min-width: auto; }
             .filter-buttons { grid-column: 1 / -1; display: flex; gap: 0.5rem; margin-top: 0.5rem; }
             .btn { padding: 0.3rem 0.8rem; font-size: 0.7rem; }
@@ -269,56 +267,14 @@
 
     <div class="filters-card">
         <div class="filters-grid">
-            <div class="filter-item">
-                <label for="gosbSelect">ГОСБ</label>
-                <select id="gosbSelect"><option value="">Все ГОСБ</option></select>
-            </div>
-            <div class="filter-item">
-                <label for="kicSelect">КИЦ</label>
-                <select id="kicSelect" disabled><option value="">Все КИЦ</option></select>
-            </div>
-            <div class="filter-item">
-                <label for="fioFilter">Ф.И.О.</label>
-                <input type="text" id="fioFilter" placeholder="Введите имя...">
-            </div>
-            <div class="filter-item">
-                <label for="datePicker">📅 Дата</label>
-                <input type="text" id="datePicker" class="flatpickr-input" placeholder="Выберите дату">
-            </div>
-            <div class="filter-item">
-                <label for="yearFilter">Год</label>
-                <select id="yearFilter"><option value="">Все годы</option></select>
-            </div>
-            <div class="filter-item">
-                <label for="quarterFilter">Квартал</label>
-                <select id="quarterFilter">
-                    <option value="">Все кварталы</option>
-                    <option value="1">1 Квартал</option>
-                    <option value="2">2 Квартал</option>
-                    <option value="3">3 Квартал</option>
-                    <option value="4">4 Квартал</option>
-                </select>
-            </div>
-            <div class="filter-item">
-                <label for="monthFilter">Месяц</label>
-                <select id="monthFilter">
-                    <option value="">Все месяцы</option>
-                    <option value="1">Январь</option><option value="2">Февраль</option><option value="3">Март</option>
-                    <option value="4">Апрель</option><option value="5">Май</option><option value="6">Июнь</option>
-                    <option value="7">Июль</option><option value="8">Август</option><option value="9">Сентябрь</option>
-                    <option value="10">Октябрь</option><option value="11">Ноябрь</option><option value="12">Декабрь</option>
-                </select>
-            </div>
-            <div class="filter-item" style="flex: 1 1 100%;">
-                <label>Фильтр по цели</label>
-                <div class="purpose-buttons">
-                    <button class="btn-purpose active" data-purpose="">Все</button>
-                    <button class="btn-purpose" data-purpose="Модуль 1">Модуль 1</button>
-                    <button class="btn-purpose" data-purpose="Модуль 2">Модуль 2</button>
-                    <button class="btn-purpose" data-purpose="ЕПП">ЕПП</button>
-                    <button class="btn-purpose" data-purpose="Контраварийная подготовка">Контраварийная</button>
-                </div>
-            </div>
+            <div class="filter-item"><label for="gosbSelect">ГОСБ</label><select id="gosbSelect"><option value="">Все ГОСБ</option></select></div>
+            <div class="filter-item"><label for="kicSelect">КИЦ</label><select id="kicSelect" disabled><option value="">Все КИЦ</option></select></div>
+            <div class="filter-item"><label for="fioFilter">Ф.И.О.</label><input type="text" id="fioFilter" placeholder="Введите имя..."></div>
+            <div class="filter-item"><label for="datePicker">📅 Дата</label><input type="text" id="datePicker" class="flatpickr-input" placeholder="Выберите дату"></div>
+            <div class="filter-item"><label for="yearFilter">Год</label><select id="yearFilter"><option value="">Все годы</option></select></div>
+            <div class="filter-item"><label for="quarterFilter">Квартал</label><select id="quarterFilter"><option value="">Все кварталы</option><option value="1">1 Квартал</option><option value="2">2 Квартал</option><option value="3">3 Квартал</option><option value="4">4 Квартал</option></select></div>
+            <div class="filter-item"><label for="monthFilter">Месяц</label><select id="monthFilter"><option value="">Все месяцы</option><option value="1">Январь</option><option value="2">Февраль</option><option value="3">Март</option><option value="4">Апрель</option><option value="5">Май</option><option value="6">Июнь</option><option value="7">Июль</option><option value="8">Август</option><option value="9">Сентябрь</option><option value="10">Октябрь</option><option value="11">Ноябрь</option><option value="12">Декабрь</option></select></div>
+            <div class="filter-item" style="flex: 1 1 100%;"><label>Фильтр по цели</label><div class="purpose-buttons"><button class="btn-purpose active" data-purpose="">Все</button><button class="btn-purpose" data-purpose="Модуль 1">Модуль 1</button><button class="btn-purpose" data-purpose="Модуль 2">Модуль 2</button><button class="btn-purpose" data-purpose="ЕПП">ЕПП</button><button class="btn-purpose" data-purpose="Контраварийная подготовка">Контраварийная</button></div></div>
             <div class="filter-buttons">
                 <button class="btn" id="applyFilters">🔍 Применить</button>
                 <button class="btn btn-outline" id="resetFilters">↺ Сбросить</button>
@@ -332,53 +288,19 @@
     </div>
 
     <div class="charts-row">
-        <div class="chart-card">
-            <h3>Регистрации по дням</h3>
-            <canvas id="dailyChart" width="400" height="250"></canvas>
-        </div>
-        <div class="chart-card">
-            <h3>Распределение по целям</h3>
-            <canvas id="purposeChart" width="400" height="250"></canvas>
-        </div>
-        <div class="chart-card">
-            <h3>📊 Обученность по КИЦ (проценты)</h3>
-            <div id="kicTableContainer" style="min-height: 300px;">
-                <table class="kic-table" id="kicTable"><tbody></tbody></table>
-                <div id="kicTablePlaceholder" class="no-data-message" style="display: none;">⬅️ Выберите ГОСБ для отображения процентов по каждому КИЦ</div>
-            </div>
-        </div>
-        <div class="chart-card">
-            <h3>Процент обученности (общий)</h3>
-            <canvas id="enrollmentChart" width="400" height="250"></canvas>
-        </div>
+        <div class="chart-card"><h3>Регистрации по дням</h3><canvas id="dailyChart" width="400" height="250"></canvas></div>
+        <div class="chart-card"><h3>Распределение по целям</h3><canvas id="purposeChart" width="400" height="250"></canvas></div>
+        <div class="chart-card"><h3>📊 Обученность по КИЦ (проценты)</h3><div id="kicTableContainer" style="min-height: 300px;"><table class="kic-table" id="kicTable"><tbody></tbody></table><div id="kicTablePlaceholder" class="no-data-message" style="display: none;">⬅️ Выберите ГОСБ для отображения процентов по каждому КИЦ</div></div></div>
+        <div class="chart-card"><h3>Процент обученности (общий)</h3><canvas id="enrollmentChart" width="400" height="250"></canvas></div>
     </div>
 
-    <div id="statisticsCard" class="filters-card" style="display: none; margin-bottom: 1rem; padding: 1rem;">
-        <div style="font-size: 1.2rem; font-weight: 600;">📊 Статистика: <span id="statText"></span></div>
-    </div>
-
-    <div class="table-card">
-        <table id="dataTable" class="display" style="width:100%">
-            <thead><tr><th>Дата и время</th><th>Табельный №</th><th>Ф.И.О.</th><th>Подразделение</th>
-            <th>Огневая ОЭТ</th><th>Блочное обучение</th><th>Радиосвязь</th>
-            <th>Учения</th><th>Контраварийная</th><th>Модуль 1</th><th>ЕПП</th></tr></thead>
-            <tbody></tbody>
-            <tfoot><tr><th><input type="text" placeholder="Дата/время"></th><th><input type="text" placeholder="Таб.№"></th>
-            <th><input type="text" placeholder="Ф.И.О."></th><th><input type="text" placeholder="Подразделение"></th>
-            <th><input type="text" placeholder="Огневая"></th><th><input type="text" placeholder="Блочное"></th>
-            <th><input type="text" placeholder="Радиосвязь"></th><th><input type="text" placeholder="Учения"></th>
-            <th><input type="text" placeholder="Контравар."></th><th><input type="text" placeholder="Модуль 1"></th>
-            <th><input type="text" placeholder="ЕПП"></th></tr></tfoot>
-        </table>
-    </div>
+    <div id="statisticsCard" class="filters-card" style="display: none; margin-bottom: 1rem; padding: 1rem;"><div style="font-size: 1.2rem; font-weight: 600;">📊 Статистика: <span id="statText"></span></div></div>
+    <div class="table-card"><table id="dataTable" class="display" style="width:100%"><thead><tr><th>Дата и время</th><th>Табельный №</th><th>Ф.И.О.</th><th>Подразделение</th><th>Огневая ОЭТ</th><th>Блочное обучение</th><th>Радиосвязь</th><th>Учения</th><th>Контраварийная</th><th>Модуль 1</th><th>ЕПП</th></tr></thead><tbody></tbody><tfoot><tr><th><input type="text" placeholder="Дата/время"></th><th><input type="text" placeholder="Таб.№"></th><th><input type="text" placeholder="Ф.И.О."></th><th><input type="text" placeholder="Подразделение"></th><th><input type="text" placeholder="Огневая"></th><th><input type="text" placeholder="Блочное"></th><th><input type="text" placeholder="Радиосвязь"></th><th><input type="text" placeholder="Учения"></th><th><input type="text" placeholder="Контравар."></th><th><input type="text" placeholder="Модуль 1"></th><th><input type="text" placeholder="ЕПП"></th></tr></tfoot></table></div>
 </div>
 
 <script>
     let table, datePicker, allGosb = [], currentPurpose = '';
     let dailyChart, purposeChart, enrollmentChart;
-
-    // Отключаем datalabels для bar-графика глобально (он нам не нужен), для pie и doughnut включим в options
-    Chart.defaults.set('plugins.datalabels', { display: false });
 
     async function loadGosbList() {
         const resp = await fetch('/api/gosb-list');
@@ -386,12 +308,7 @@
         allGosb = data;
         const select = document.getElementById('gosbSelect');
         select.innerHTML = '<option value="">Все ГОСБ</option>';
-        data.forEach(g => {
-            const opt = document.createElement('option');
-            opt.value = g.name;
-            opt.textContent = g.name;
-            select.appendChild(opt);
-        });
+        data.forEach(g => { const opt = document.createElement('option'); opt.value = g.name; opt.textContent = g.name; select.appendChild(opt); });
     }
 
     document.getElementById('gosbSelect').addEventListener('change', async function() {
@@ -406,48 +323,21 @@
         const resp = await fetch(`/api/cities-by-gosb?gosb_name=${encodeURIComponent(gosbName)}`);
         const cities = await resp.json();
         kicSelect.innerHTML = '<option value="">Все КИЦ</option>';
-        cities.forEach(city => {
-            const opt = document.createElement('option');
-            opt.value = city;
-            opt.textContent = city;
-            kicSelect.appendChild(opt);
-        });
+        cities.forEach(city => { const opt = document.createElement('option'); opt.value = city; opt.textContent = city; kicSelect.appendChild(opt); });
         kicSelect.disabled = false;
         updateKicTable();
     });
 
-    function initDatePicker() {
-        datePicker = flatpickr("#datePicker", {
-            locale: "ru",
-            dateFormat: "d.m.Y",
-            disableMobile: false,
-            allowInput: true
-        });
-    }
-
-    function formatDateForApi(dateStr) {
-        if (!dateStr) return null;
-        const parts = dateStr.split('.');
-        if (parts.length !== 3) return null;
-        return `${parts[2]}-${parts[1]}-${parts[0]}`;
-    }
+    function initDatePicker() { datePicker = flatpickr("#datePicker", { locale: "ru", dateFormat: "d.m.Y", disableMobile: false, allowInput: true }); }
+    function formatDateForApi(dateStr) { if (!dateStr) return null; const parts = dateStr.split('.'); if (parts.length !== 3) return null; return `${parts[2]}-${parts[1]}-${parts[0]}`; }
 
     async function updateKicTable() {
         const gosb = document.getElementById('gosbSelect').value;
-        if (!gosb) {
-            document.getElementById('kicTable').style.display = 'none';
-            document.getElementById('kicTablePlaceholder').style.display = 'flex';
-            return;
-        }
+        if (!gosb) { document.getElementById('kicTable').style.display = 'none'; document.getElementById('kicTablePlaceholder').style.display = 'flex'; return; }
         document.getElementById('kicTable').style.display = 'table';
         document.getElementById('kicTablePlaceholder').style.display = 'none';
-
-        const year = document.getElementById('yearFilter').value;
-        const quarter = document.getElementById('quarterFilter').value;
-        const month = document.getElementById('monthFilter').value;
-        const exactDate = formatDateForApi(document.getElementById('datePicker').value);
-        const city = document.getElementById('kicSelect').value;
-
+        const year = document.getElementById('yearFilter').value, quarter = document.getElementById('quarterFilter').value, month = document.getElementById('monthFilter').value;
+        const exactDate = formatDateForApi(document.getElementById('datePicker').value), city = document.getElementById('kicSelect').value;
         let url = '/api/kic-percentages?';
         const params = new URLSearchParams();
         params.append('gosb', gosb);
@@ -458,7 +348,6 @@
         if (exactDate) params.append('exact_date', exactDate);
         if (currentPurpose) params.append('purpose', currentPurpose);
         url += params.toString();
-
         try {
             const resp = await fetch(url);
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -472,55 +361,31 @@
                 return;
             }
             for (let i = 0; i < data.kic_names.length; i++) {
-                const name = data.kic_names[i];
-                const percent = data.percentages[i];
+                const name = data.kic_names[i], percent = data.percentages[i];
                 if (name === 'Другие' && percent === 0) continue;
                 const row = tbody.insertRow();
-                const cellName = row.insertCell(0);
-                const cellBar = row.insertCell(1);
-                cellName.className = 'kic-name';
-                cellName.textContent = name;
-                cellBar.style.width = '100%';
-                const container = document.createElement('div');
-                container.className = 'progress-container';
-                const bar = document.createElement('div');
-                bar.className = 'progress-bar';
-                bar.style.width = `${percent}%`;
+                const cellName = row.insertCell(0), cellBar = row.insertCell(1);
+                cellName.className = 'kic-name'; cellName.textContent = name; cellBar.style.width = '100%';
+                const container = document.createElement('div'); container.className = 'progress-container';
+                const bar = document.createElement('div'); bar.className = 'progress-bar'; bar.style.width = `${percent}%`;
                 bar.textContent = percent >= 25 ? `${percent}%` : '';
-                const valueSpan = document.createElement('div');
-                valueSpan.className = 'progress-value';
-                valueSpan.textContent = `${percent}%`;
+                const valueSpan = document.createElement('div'); valueSpan.className = 'progress-value'; valueSpan.textContent = `${percent}%`;
                 if (percent > 20) valueSpan.style.display = 'none';
                 else valueSpan.style.color = '#e0e0e0';
                 if (percent > 25) bar.style.paddingLeft = '12px';
-                container.appendChild(bar);
-                container.appendChild(valueSpan);
-                cellBar.appendChild(container);
+                container.appendChild(bar); container.appendChild(valueSpan); cellBar.appendChild(container);
             }
             if (tbody.rows.length === 0) {
                 document.getElementById('kicTable').style.display = 'none';
                 document.getElementById('kicTablePlaceholder').style.display = 'flex';
                 document.getElementById('kicTablePlaceholder').innerHTML = '⚠️ Нет данных для отображения (все КИЦ имеют 0%)';
             }
-        } catch (err) {
-            console.error('Ошибка загрузки процентов по КИЦ:', err);
-            document.getElementById('kicTable').style.display = 'none';
-            document.getElementById('kicTablePlaceholder').style.display = 'flex';
-            document.getElementById('kicTablePlaceholder').innerHTML = '❌ Ошибка загрузки данных. Проверьте бекенд /api/kic-percentages';
-        }
+        } catch (err) { console.error('Ошибка загрузки процентов по КИЦ:', err); document.getElementById('kicTable').style.display = 'none'; document.getElementById('kicTablePlaceholder').style.display = 'flex'; document.getElementById('kicTablePlaceholder').innerHTML = '❌ Ошибка загрузки данных. Проверьте бекенд /api/kic-percentages'; }
     }
 
     async function loadStatistics() {
-        const gosb = document.getElementById('gosbSelect').value;
-        const city = document.getElementById('kicSelect').value;
-        const year = document.getElementById('yearFilter').value;
-        const quarter = document.getElementById('quarterFilter').value;
-        const month = document.getElementById('monthFilter').value;
-        const exactDate = formatDateForApi(document.getElementById('datePicker').value);
-        if (!gosb && !city) {
-            document.getElementById('statisticsCard').style.display = 'none';
-            return;
-        }
+        const gosb = document.getElementById('gosbSelect').value, city = document.getElementById('kicSelect').value, year = document.getElementById('yearFilter').value, quarter = document.getElementById('quarterFilter').value, month = document.getElementById('monthFilter').value, exactDate = formatDateForApi(document.getElementById('datePicker').value);
+        if (!gosb && !city) { document.getElementById('statisticsCard').style.display = 'none'; return; }
         let url = '/api/statistics?';
         const params = new URLSearchParams();
         if (gosb) params.append('gosb', gosb);
@@ -539,24 +404,12 @@
                 let purposeText = currentPurpose ? ` на «${currentPurpose}»` : '';
                 document.getElementById('statText').innerHTML = `Обучено${purposeText}: <strong>${stats.registered_unique}</strong> из <strong>${stats.total_employees}</strong> сотрудников (<strong>${stats.percentage}%</strong>)`;
                 statCard.style.display = 'block';
-            } else {
-                document.getElementById('statText').innerHTML = `⚠️ Нет данных о сотрудниках для выбранного подразделения.`;
-                statCard.style.display = 'block';
-            }
-        } catch (err) {
-            console.error('Ошибка загрузки статистики:', err);
-            document.getElementById('statisticsCard').style.display = 'none';
-        }
+            } else { document.getElementById('statText').innerHTML = `⚠️ Нет данных о сотрудниках для выбранного подразделения.`; statCard.style.display = 'block'; }
+        } catch (err) { console.error('Ошибка загрузки статистики:', err); document.getElementById('statisticsCard').style.display = 'none'; }
     }
 
     async function loadTableData() {
-        const gosb = document.getElementById('gosbSelect').value;
-        const city = document.getElementById('kicSelect').value;
-        const fio = document.getElementById('fioFilter').value;
-        const year = document.getElementById('yearFilter').value;
-        const quarter = document.getElementById('quarterFilter').value;
-        const month = document.getElementById('monthFilter').value;
-        const exactDate = formatDateForApi(document.getElementById('datePicker').value);
+        const gosb = document.getElementById('gosbSelect').value, city = document.getElementById('kicSelect').value, fio = document.getElementById('fioFilter').value, year = document.getElementById('yearFilter').value, quarter = document.getElementById('quarterFilter').value, month = document.getElementById('monthFilter').value, exactDate = formatDateForApi(document.getElementById('datePicker').value);
         let url = '/api/report-data?';
         const params = new URLSearchParams();
         if (gosb) params.append('gosb', gosb);
@@ -570,55 +423,65 @@
         url += params.toString();
         const resp = await fetch(url);
         const data = await resp.json();
-        const tableData = data.map(row => [
-            row.timestamp, row.tab_number || '', row.fio, row.subdivision || '',
-            row.fire_training || '', row.block_training || '', row.radio_comm || '',
-            row.drills || '', row.emergency || '', row.module1 || '', row.epp || ''
-        ]);
-        if (table) {
-            table.clear();
-            table.rows.add(tableData);
-            table.draw();
-        } else {
+        const tableData = data.map(row => [ row.timestamp, row.tab_number || '', row.fio, row.subdivision || '', row.fire_training || '', row.block_training || '', row.radio_comm || '', row.drills || '', row.emergency || '', row.module1 || '', row.epp || '' ]);
+        if (table) { table.clear(); table.rows.add(tableData); table.draw(); } 
+        else {
             table = $('#dataTable').DataTable({
                 data: tableData,
-                columns: [
-                    { title: "Дата и время" }, { title: "Табельный №" }, { title: "Ф.И.О." }, { title: "Подразделение" },
-                    { title: "Огневая ОЭТ" }, { title: "Блочное обучение" }, { title: "Радиосвязь" },
-                    { title: "Учения" }, { title: "Контраварийная" }, { title: "Модуль 1" }, { title: "ЕПП" }
-                ],
+                columns: [ { title: "Дата и время" }, { title: "Табельный №" }, { title: "Ф.И.О." }, { title: "Подразделение" }, { title: "Огневая ОЭТ" }, { title: "Блочное обучение" }, { title: "Радиосвязь" }, { title: "Учения" }, { title: "Контраварийная" }, { title: "Модуль 1" }, { title: "ЕПП" } ],
                 order: [[0, 'desc']],
-                language: {
-                    search: "Глобальный поиск:",
-                    lengthMenu: "Показать _MENU_ записей",
-                    info: "Записи с _START_ по _END_ из _TOTAL_",
-                    paginate: { first: "Первая", last: "Последняя", next: "→", previous: "←" }
-                },
-                initComplete: function () {
-                    this.api().columns().every(function () {
-                        let column = this;
-                        let input = $(column.footer()).find('input');
-                        input.on('keyup change', function () { column.search(this.value).draw(); });
-                    });
-                }
+                language: { search: "Глобальный поиск:", lengthMenu: "Показать _MENU_ записей", info: "Записи с _START_ по _END_ из _TOTAL_", paginate: { first: "Первая", last: "Последняя", next: "→", previous: "←" } },
+                initComplete: function () { this.api().columns().every(function () { let column = this; let input = $(column.footer()).find('input'); input.on('keyup change', function () { column.search(this.value).draw(); }); }); }
             });
             $('.dataTables_filter').hide();
             const lengthDiv = $('.dataTables_length');
-            if (lengthDiv.length && $('#recordsCounter').length === 0) {
-                lengthDiv.after('<span id="recordsCounter" class="records-counter">Всего: <span class="total-count">0</span> чел.</span>');
-            }
+            if (lengthDiv.length && $('#recordsCounter').length === 0) { lengthDiv.after('<span id="recordsCounter" class="records-counter">Всего: <span class="total-count">0</span> чел.</span>'); }
         }
         const filteredCount = table.rows({ search: 'applied' }).count();
         $('#recordsCounter .total-count').text(filteredCount);
     }
 
+    // Функция для прорисовки процентов на круговой диаграмме (pie или doughnut)
+    function drawPercentLabels(chartInstance) {
+        const ctx = chartInstance.ctx;
+        const dataset = chartInstance.data.datasets[0];
+        const total = dataset.data.reduce((a, b) => a + b, 0);
+        if (total === 0) return;
+        const meta = chartInstance.getDatasetMeta(0);
+        const arcs = meta.data;
+        ctx.save();
+        ctx.font = 'bold 14px "Inter", sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowBlur = 0;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        arcs.forEach((arc, i) => {
+            const value = dataset.data[i];
+            if (value === 0) return;
+            const percent = (value / total * 100).toFixed(1);
+            const center = arc.getCenterPoint();
+            // Добавляем лёгкую тень для читаемости
+            ctx.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx.shadowBlur = 2;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(`${percent}%`, center.x, center.y);
+        });
+        ctx.restore();
+    }
+
+    // Улучшение: переопределяем draw для круговых диаграмм
+    function enhanceCircularChart(chart, type) {
+        const originalDraw = chart.draw;
+        chart.draw = function() {
+            originalDraw.apply(this, arguments);
+            drawPercentLabels(this);
+        };
+        // Также вызываем принудительно после создания
+        setTimeout(() => drawPercentLabels(chart), 50);
+    }
+
     async function loadCharts() {
-        const gosb = document.getElementById('gosbSelect').value;
-        const city = document.getElementById('kicSelect').value;
-        const year = document.getElementById('yearFilter').value;
-        const quarter = document.getElementById('quarterFilter').value;
-        const month = document.getElementById('monthFilter').value;
-        const exactDate = formatDateForApi(document.getElementById('datePicker').value);
+        const gosb = document.getElementById('gosbSelect').value, city = document.getElementById('kicSelect').value, year = document.getElementById('yearFilter').value, quarter = document.getElementById('quarterFilter').value, month = document.getElementById('monthFilter').value, exactDate = formatDateForApi(document.getElementById('datePicker').value);
         let url = '/api/charts-data?';
         const params = new URLSearchParams();
         if (gosb) params.append('gosb', gosb);
@@ -637,36 +500,16 @@
         dailyChart = new Chart(document.getElementById('dailyChart'), {
             type: 'bar',
             data: { labels: data.days, datasets: [{ label: 'Регистрации', data: data.daily_counts, backgroundColor: 'rgba(108, 92, 231, 0.6)' }] },
-            options: { responsive: true, plugins: { legend: { labels: { color: '#e0e0e0' } }, datalabels: { display: false } } }
+            options: { responsive: true, plugins: { legend: { labels: { color: '#e0e0e0' } } } }
         });
 
         if (purposeChart) purposeChart.destroy();
         purposeChart = new Chart(document.getElementById('purposeChart'), {
             type: 'pie',
             data: { labels: data.purposes, datasets: [{ data: data.purpose_counts, backgroundColor: ['#6c5ce7', '#a463f5', '#fed6e3', '#a8ede0', '#ff9f43'] }] },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: { position: 'bottom', labels: { color: '#e0e0e0' } },
-                    datalabels: {
-                        display: true,
-                        color: 'white',
-                        backgroundColor: 'rgba(0,0,0,0.6)',
-                        borderRadius: 4,
-                        padding: { left: 6, right: 6, top: 4, bottom: 4 },
-                        font: { weight: 'bold', size: 14 },
-                        formatter: (value, context) => {
-                            const total = context.dataset.data.reduce((a,b) => a + b, 0);
-                            if (total === 0) return '0%';
-                            const percent = (value / total * 100).toFixed(1);
-                            return `${percent}%`;
-                        },
-                        anchor: 'center',
-                        align: 'center'
-                    }
-                }
-            }
+            options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#e0e0e0' } } } }
         });
+        enhanceCircularChart(purposeChart, 'pie');
 
         const notRegistered = data.total_employees - data.registered_count;
         if (enrollmentChart) enrollmentChart.destroy();
@@ -677,26 +520,11 @@
                 responsive: true,
                 plugins: {
                     legend: { position: 'bottom', labels: { color: '#e0e0e0' } },
-                    tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw} чел. (${((ctx.raw / data.total_employees) * 100).toFixed(1)}%)` } },
-                    datalabels: {
-                        display: true,
-                        color: 'white',
-                        backgroundColor: 'rgba(0,0,0,0.6)',
-                        borderRadius: 4,
-                        padding: { left: 6, right: 6, top: 4, bottom: 4 },
-                        font: { weight: 'bold', size: 14 },
-                        formatter: (value) => {
-                            const total = data.total_employees;
-                            if (total === 0) return '0%';
-                            const percent = (value / total * 100).toFixed(1);
-                            return `${percent}%`;
-                        },
-                        anchor: 'center',
-                        align: 'center'
-                    }
+                    tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw} чел. (${((ctx.raw / data.total_employees) * 100).toFixed(1)}%)` } }
                 }
             }
         });
+        enhanceCircularChart(enrollmentChart, 'doughnut');
     }
 
     function resetFilters() {
@@ -726,60 +554,10 @@
     document.getElementById('resetFilters').addEventListener('click', resetFilters);
     document.getElementById('refreshBtn').addEventListener('click', () => { loadTableData(); loadStatistics(); loadCharts(); updateKicTable(); });
 
-    document.getElementById('sendTelegramBtn').addEventListener('click', async function() {
-        const btn = this; btn.disabled = true; btn.textContent = '⏳ Отправка...';
-        try {
-            const resp = await fetch('/api/send-today-reports', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
-            const result = await resp.json();
-            alert(result.status === 'ok' ? `Отчёты отправлены в ${result.sent} чатов` : 'Ошибка: ' + (result.message || 'неизвестная ошибка'));
-        } catch (err) { alert('Ошибка соединения: ' + err.message); }
-        finally { btn.disabled = false; btn.textContent = '📨 Отправить в СберЧат'; }
-    });
-    document.getElementById('exportExcelBtn').addEventListener('click', async function() {
-        const filteredData = table.rows({ search: 'applied' }).data().toArray();
-        if (filteredData.length === 0) { alert('Нет данных для выгрузки'); return; }
-        const btn = this; btn.disabled = true; btn.textContent = '⏳ Создание...';
-        try {
-            const resp = await fetch('/api/export-excel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: filteredData }) });
-            if (resp.ok) {
-                const blob = await resp.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `report_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.xlsx`; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url);
-            } else { const err = await resp.json(); alert('Ошибка: ' + (err.message || 'неизвестная ошибка')); }
-        } catch (err) { alert('Ошибка соединения: ' + err.message); }
-        finally { btn.disabled = false; btn.textContent = '📊 Выгрузить в Excel'; }
-    });
-    document.getElementById('remindKicBtn').addEventListener('click', async function() {
-        const btn = this; btn.disabled = true; btn.textContent = '⏳ Отправка...';
-        try {
-            const resp = await fetch('/api/send-kic-reminders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ days: 30, purpose: '' }) });
-            const result = await resp.json();
-            if (result.status === 'ok') { let msg = 'Напоминания отправлены:\n'; result.results.forEach(r => { msg += `${r.kic}: ${r.error || `отправлено ${r.sent} сотрудникам → ${r.to}`}\n`; }); alert(msg); } else { alert('Ошибка: ' + (result.message || 'неизвестная ошибка')); }
-        } catch (err) { alert('Ошибка соединения: ' + err.message); }
-        finally { btn.disabled = false; btn.textContent = '📧 Напомнить руководителям КИЦ'; }
-    });
-    document.getElementById('exportPptxBtn').addEventListener('click', async function() {
-        const btn = this; btn.disabled = true; btn.textContent = '⏳ Создание презентации...';
-        try {
-            const tableContainer = document.getElementById('kicTableContainer');
-            if (!tableContainer) throw new Error('Контейнер таблицы не найден');
-            const gosb = document.getElementById('gosbSelect').value || 'Не выбран';
-            const statsText = document.getElementById('statText').innerText || 'Нет статистики';
-            const canvas = await html2canvas(tableContainer, { scale: 2, backgroundColor: '#1a1a2e', logging: false });
-            const imgData = canvas.toDataURL('image/png');
-            const pptx = new PptxGenJS();
-            const slide = pptx.addSlide();
-            slide.addText(`Обученность по КИЦ – ${gosb}`, { x: 0.5, y: 0.2, w: 9, h: 0.8, fontSize: 18, bold: true, color: 'FFFFFF' });
-            slide.addText(statsText.substring(0, 100), { x: 0.5, y: 1.0, w: 9, h: 0.5, fontSize: 12, color: 'CCCCCC' });
-            slide.addImage({ data: imgData, x: 0.5, y: 1.6, w: 9, h: 5.0, sizing: { type: 'contain' } });
-            await pptx.writeFile({ fileName: `kic_report_${gosb}.pptx` });
-            alert('Презентация сохранена!');
-        } catch (err) {
-            console.error(err);
-            alert('Ошибка при создании презентации: ' + err.message);
-        } finally {
-            btn.disabled = false;
-            btn.textContent = '📊 Экспорт в PowerPoint';
-        }
-    });
+    document.getElementById('sendTelegramBtn').addEventListener('click', async function() { const btn = this; btn.disabled = true; btn.textContent = '⏳ Отправка...'; try { const resp = await fetch('/api/send-today-reports', { method: 'POST', headers: { 'Content-Type': 'application/json' } }); const result = await resp.json(); alert(result.status === 'ok' ? `Отчёты отправлены в ${result.sent} чатов` : 'Ошибка: ' + (result.message || 'неизвестная ошибка')); } catch (err) { alert('Ошибка соединения: ' + err.message); } finally { btn.disabled = false; btn.textContent = '📨 Отправить в СберЧат'; } });
+    document.getElementById('exportExcelBtn').addEventListener('click', async function() { const filteredData = table.rows({ search: 'applied' }).data().toArray(); if (filteredData.length === 0) { alert('Нет данных для выгрузки'); return; } const btn = this; btn.disabled = true; btn.textContent = '⏳ Создание...'; try { const resp = await fetch('/api/export-excel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: filteredData }) }); if (resp.ok) { const blob = await resp.blob(); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `report_${new Date().toISOString().slice(0,19).replace(/:/g, '-')}.xlsx`; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url); } else { const err = await resp.json(); alert('Ошибка: ' + (err.message || 'неизвестная ошибка')); } } catch (err) { alert('Ошибка соединения: ' + err.message); } finally { btn.disabled = false; btn.textContent = '📊 Выгрузить в Excel'; } });
+    document.getElementById('remindKicBtn').addEventListener('click', async function() { const btn = this; btn.disabled = true; btn.textContent = '⏳ Отправка...'; try { const resp = await fetch('/api/send-kic-reminders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ days: 30, purpose: '' }) }); const result = await resp.json(); if (result.status === 'ok') { let msg = 'Напоминания отправлены:\n'; result.results.forEach(r => { msg += `${r.kic}: ${r.error || `отправлено ${r.sent} сотрудникам → ${r.to}`}\n`; }); alert(msg); } else { alert('Ошибка: ' + (result.message || 'неизвестная ошибка')); } } catch (err) { alert('Ошибка соединения: ' + err.message); } finally { btn.disabled = false; btn.textContent = '📧 Напомнить руководителям КИЦ'; } });
+    document.getElementById('exportPptxBtn').addEventListener('click', async function() { const btn = this; btn.disabled = true; btn.textContent = '⏳ Создание презентации...'; try { const tableContainer = document.getElementById('kicTableContainer'); if (!tableContainer) throw new Error('Контейнер таблицы не найден'); const gosb = document.getElementById('gosbSelect').value || 'Не выбран'; const statsText = document.getElementById('statText').innerText || 'Нет статистики'; const canvas = await html2canvas(tableContainer, { scale: 2, backgroundColor: '#1a1a2e', logging: false }); const imgData = canvas.toDataURL('image/png'); const pptx = new PptxGenJS(); const slide = pptx.addSlide(); slide.addText(`Обученность по КИЦ – ${gosb}`, { x: 0.5, y: 0.2, w: 9, h: 0.8, fontSize: 18, bold: true, color: 'FFFFFF' }); slide.addText(statsText.substring(0, 100), { x: 0.5, y: 1.0, w: 9, h: 0.5, fontSize: 12, color: 'CCCCCC' }); slide.addImage({ data: imgData, x: 0.5, y: 1.6, w: 9, h: 5.0, sizing: { type: 'contain' } }); await pptx.writeFile({ fileName: `kic_report_${gosb}.pptx` }); alert('Презентация сохранена!'); } catch (err) { console.error(err); alert('Ошибка при создании презентации: ' + err.message); } finally { btn.disabled = false; btn.textContent = '📊 Экспорт в PowerPoint'; } });
 
     window.onload = async () => {
         initDatePicker();

@@ -5,19 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
     <title>AI Сводная панель обучения — Процент обученности по КИЦ</title>
 
-    <!-- DataTables -->
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
-    <!-- flatpickr -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://npmcdn.com/flatpickr/dist/l10n/ru.js"></script>
-    <!-- html2canvas + pptxgenjs -->
+    <!-- html2canvas + pptxgenjs для экспорта -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 
@@ -29,19 +26,9 @@
             color: #e0e0e0;
             min-height: 100vh;
             padding: 2rem 1.5rem;
-            position: relative;
             overflow-x: auto;
         }
-        body::before {
-            content: ''; position: fixed; top: -50%; left: -50%;
-            width: 200%; height: 200%;
-            background: radial-gradient(circle at 70% 30%, rgba(108, 92, 231, 0.15) 0%, transparent 50%);
-            z-index: 0; pointer-events: none;
-        }
-        .container {
-            max-width: 1600px; margin: 0 auto; position: relative; z-index: 1;
-            backdrop-filter: blur(10px);
-        }
+        .container { max-width: 1600px; margin: 0 auto; position: relative; z-index: 1; }
         h1 {
             font-size: 2rem; font-weight: 700; margin-bottom: 1rem;
             background: linear-gradient(90deg, #a8ede0, #fed6e3);
@@ -343,7 +330,6 @@
         </div>
     </div>
 
-    <!-- Блок графиков -->
     <div class="charts-row">
         <div class="chart-card">
             <h3>Регистрации по дням</h3>
@@ -356,9 +342,7 @@
         <div class="chart-card">
             <h3>📊 Обученность по КИЦ (проценты)</h3>
             <div id="kicTableContainer" style="min-height: 300px;">
-                <table class="kic-table" id="kicTable">
-                    <tbody></tbody>
-                </table>
+                <table class="kic-table" id="kicTable"><tbody></tbody></table>
                 <div id="kicTablePlaceholder" class="no-data-message" style="display: none;">⬅️ Выберите ГОСБ для отображения процентов по каждому КИЦ</div>
             </div>
         </div>
@@ -368,42 +352,28 @@
         </div>
     </div>
 
-    <!-- Блок статистики -->
     <div id="statisticsCard" class="filters-card" style="display: none; margin-bottom: 1rem; padding: 1rem;">
-        <div style="font-size: 1.2rem; font-weight: 600;">
-            📊 Статистика: <span id="statText">Обучено X из Y сотрудников (Z%)</span>
-        </div>
+        <div style="font-size: 1.2rem; font-weight: 600;">📊 Статистика: <span id="statText"></span></div>
     </div>
 
     <div class="table-card">
         <table id="dataTable" class="display" style="width:100%">
-            <thead>
-                <tr>
-                    <th>Дата и время</th><th>Табельный №</th><th>Ф.И.О.</th><th>Подразделение</th>
-                    <th>Огневая ОЭТ</th><th>Блочное обучение</th><th>Радиосвязь</th>
-                    <th>Учения</th><th>Контраварийная</th><th>Модуль 1</th><th>ЕПП</th>
-                </tr>
-            </thead>
+            <thead><tr><th>Дата и время</th><th>Табельный №</th><th>Ф.И.О.</th><th>Подразделение</th>
+            <th>Огневая ОЭТ</th><th>Блочное обучение</th><th>Радиосвязь</th>
+            <th>Учения</th><th>Контраварийная</th><th>Модуль 1</th><th>ЕПП</th></tr></thead>
             <tbody></tbody>
-            <tfoot>
-                <tr>
-                    <th><input type="text" placeholder="Дата/время"></th><th><input type="text" placeholder="Таб.№"></th>
-                    <th><input type="text" placeholder="Ф.И.О."></th><th><input type="text" placeholder="Подразделение"></th>
-                    <th><input type="text" placeholder="Огневая"></th><th><input type="text" placeholder="Блочное"></th>
-                    <th><input type="text" placeholder="Радиосвязь"></th><th><input type="text" placeholder="Учения"></th>
-                    <th><input type="text" placeholder="Контравар."></th><th><input type="text" placeholder="Модуль 1"></th>
-                    <th><input type="text" placeholder="ЕПП"></th>
-                </tr>
-            </tfoot>
+            <tfoot><tr><th><input type="text" placeholder="Дата/время"></th><th><input type="text" placeholder="Таб.№"></th>
+            <th><input type="text" placeholder="Ф.И.О."></th><th><input type="text" placeholder="Подразделение"></th>
+            <th><input type="text" placeholder="Огневая"></th><th><input type="text" placeholder="Блочное"></th>
+            <th><input type="text" placeholder="Радиосвязь"></th><th><input type="text" placeholder="Учения"></th>
+            <th><input type="text" placeholder="Контравар."></th><th><input type="text" placeholder="Модуль 1"></th>
+            <th><input type="text" placeholder="ЕПП"></th></tr></tfoot>
         </table>
     </div>
 </div>
 
 <script>
-    let table;
-    let datePicker;
-    let allGosb = [];
-    let currentPurpose = '';
+    let table, datePicker, allGosb = [], currentPurpose = '';
     let dailyChart, purposeChart, enrollmentChart;
 
     async function loadGosbList() {
@@ -465,7 +435,6 @@
             document.getElementById('kicTablePlaceholder').style.display = 'flex';
             return;
         }
-
         document.getElementById('kicTable').style.display = 'table';
         document.getElementById('kicTablePlaceholder').style.display = 'none';
 
@@ -492,26 +461,22 @@
             const data = await resp.json();
             const tbody = document.querySelector('#kicTable tbody');
             tbody.innerHTML = '';
-
             if (!data.kic_names || data.kic_names.length === 0) {
                 document.getElementById('kicTable').style.display = 'none';
                 document.getElementById('kicTablePlaceholder').style.display = 'flex';
                 document.getElementById('kicTablePlaceholder').innerHTML = '⚠️ Нет данных о КИЦ для выбранного ГОСБ / фильтров';
                 return;
             }
-
             for (let i = 0; i < data.kic_names.length; i++) {
                 const name = data.kic_names[i];
                 const percent = data.percentages[i];
                 if (name === 'Другие' && percent === 0) continue;
-
                 const row = tbody.insertRow();
                 const cellName = row.insertCell(0);
                 const cellBar = row.insertCell(1);
                 cellName.className = 'kic-name';
                 cellName.textContent = name;
                 cellBar.style.width = '100%';
-                
                 const container = document.createElement('div');
                 container.className = 'progress-container';
                 const bar = document.createElement('div');
@@ -521,18 +486,13 @@
                 const valueSpan = document.createElement('div');
                 valueSpan.className = 'progress-value';
                 valueSpan.textContent = `${percent}%`;
-                if (percent > 20) {
-                    valueSpan.style.display = 'none';
-                } else {
-                    valueSpan.style.color = '#e0e0e0';
-                    valueSpan.style.textShadow = 'none';
-                }
+                if (percent > 20) valueSpan.style.display = 'none';
+                else valueSpan.style.color = '#e0e0e0';
                 if (percent > 25) bar.style.paddingLeft = '12px';
                 container.appendChild(bar);
                 container.appendChild(valueSpan);
                 cellBar.appendChild(container);
             }
-
             if (tbody.rows.length === 0) {
                 document.getElementById('kicTable').style.display = 'none';
                 document.getElementById('kicTablePlaceholder').style.display = 'flex';
@@ -553,12 +513,10 @@
         const quarter = document.getElementById('quarterFilter').value;
         const month = document.getElementById('monthFilter').value;
         const exactDate = formatDateForApi(document.getElementById('datePicker').value);
-
         if (!gosb && !city) {
             document.getElementById('statisticsCard').style.display = 'none';
             return;
         }
-
         let url = '/api/statistics?';
         const params = new URLSearchParams();
         if (gosb) params.append('gosb', gosb);
@@ -569,7 +527,6 @@
         if (exactDate) params.append('exact_date', exactDate);
         if (currentPurpose) params.append('purpose', currentPurpose);
         url += params.toString();
-
         try {
             const resp = await fetch(url);
             const stats = await resp.json();
@@ -596,7 +553,6 @@
         const quarter = document.getElementById('quarterFilter').value;
         const month = document.getElementById('monthFilter').value;
         const exactDate = formatDateForApi(document.getElementById('datePicker').value);
-
         let url = '/api/report-data?';
         const params = new URLSearchParams();
         if (gosb) params.append('gosb', gosb);
@@ -608,24 +564,13 @@
         if (exactDate) params.append('exact_date', exactDate);
         if (currentPurpose) params.append('purpose', currentPurpose);
         url += params.toString();
-
         const resp = await fetch(url);
         const data = await resp.json();
-
         const tableData = data.map(row => [
-            row.timestamp,
-            row.tab_number || '',
-            row.fio,
-            row.subdivision || '',
-            row.fire_training || '',
-            row.block_training || '',
-            row.radio_comm || '',
-            row.drills || '',
-            row.emergency || '',
-            row.module1 || '',
-            row.epp || ''
+            row.timestamp, row.tab_number || '', row.fio, row.subdivision || '',
+            row.fire_training || '', row.block_training || '', row.radio_comm || '',
+            row.drills || '', row.emergency || '', row.module1 || '', row.epp || ''
         ]);
-
         if (table) {
             table.clear();
             table.rows.add(tableData);
@@ -649,9 +594,7 @@
                     this.api().columns().every(function () {
                         let column = this;
                         let input = $(column.footer()).find('input');
-                        input.on('keyup change', function () {
-                            column.search(this.value).draw();
-                        });
+                        input.on('keyup change', function () { column.search(this.value).draw(); });
                     });
                 }
             });
@@ -661,9 +604,41 @@
                 lengthDiv.after('<span id="recordsCounter" class="records-counter">Всего: <span class="total-count">0</span> чел.</span>');
             }
         }
-
         const filteredCount = table.rows({ search: 'applied' }).count();
         $('#recordsCounter .total-count').text(filteredCount);
+    }
+
+    // Функция для ручной отрисовки процентов на doughnut-диаграмме (без плагинов)
+    function drawPercentsOnDoughnut(chartInstance) {
+        const ctx = chartInstance.ctx;
+        const canvas = chartInstance.canvas;
+        const data = chartInstance.data.datasets[0].data;
+        const total = data.reduce((a, b) => a + b, 0);
+        if (total === 0) return;
+
+        const meta = chartInstance.getDatasetMeta(0);
+        const arcs = meta.data;
+
+        ctx.save();
+        ctx.font = 'bold 14px "Inter", sans-serif';
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowBlur = 0;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        arcs.forEach((arc, i) => {
+            const value = data[i];
+            if (value === 0) return;
+            const percent = (value / total * 100).toFixed(1);
+            const center = arc.getCenterPoint();
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowBlur = 0;
+            // Добавляем чёрную подложку для читаемости
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowBlur = 0;
+            ctx.fillText(`${percent}%`, center.x, center.y);
+        });
+        ctx.restore();
     }
 
     async function loadCharts() {
@@ -673,7 +648,6 @@
         const quarter = document.getElementById('quarterFilter').value;
         const month = document.getElementById('monthFilter').value;
         const exactDate = formatDateForApi(document.getElementById('datePicker').value);
-
         let url = '/api/charts-data?';
         const params = new URLSearchParams();
         if (gosb) params.append('gosb', gosb);
@@ -684,73 +658,47 @@
         if (exactDate) params.append('exact_date', exactDate);
         if (currentPurpose) params.append('purpose', currentPurpose);
         url += params.toString();
-
         const resp = await fetch(url);
         const data = await resp.json();
-        if (data.error) {
-            console.error(data.error);
-            return;
-        }
+        if (data.error) { console.error(data.error); return; }
 
         if (dailyChart) dailyChart.destroy();
-        const ctxDaily = document.getElementById('dailyChart').getContext('2d');
-        dailyChart = new Chart(ctxDaily, {
+        dailyChart = new Chart(document.getElementById('dailyChart'), {
             type: 'bar',
-            data: { labels: data.days, datasets: [{ label: 'Регистрации', data: data.daily_counts, backgroundColor: 'rgba(108, 92, 231, 0.6)', borderColor: '#6c5ce7', borderWidth: 1 }] },
-            options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { labels: { color: '#e0e0e0' } } }, scales: { x: { ticks: { color: '#e0e0e0', maxRotation: 45 } }, y: { ticks: { color: '#e0e0e0' } } } }
+            data: { labels: data.days, datasets: [{ label: 'Регистрации', data: data.daily_counts, backgroundColor: 'rgba(108, 92, 231, 0.6)' }] },
+            options: { responsive: true, plugins: { legend: { labels: { color: '#e0e0e0' } } } }
         });
 
         if (purposeChart) purposeChart.destroy();
-        const ctxPurpose = document.getElementById('purposeChart').getContext('2d');
-        purposeChart = new Chart(ctxPurpose, {
+        purposeChart = new Chart(document.getElementById('purposeChart'), {
             type: 'pie',
             data: { labels: data.purposes, datasets: [{ data: data.purpose_counts, backgroundColor: ['#6c5ce7', '#a463f5', '#fed6e3', '#a8ede0', '#ff9f43'] }] },
             options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#e0e0e0' } } } }
         });
 
-        // График обученности (doughnut) с ручной отрисовкой процентов поверх
         const notRegistered = data.total_employees - data.registered_count;
         if (enrollmentChart) enrollmentChart.destroy();
-        const ctxEnroll = document.getElementById('enrollmentChart').getContext('2d');
-        enrollmentChart = new Chart(ctxEnroll, {
+        const ctx = document.getElementById('enrollmentChart').getContext('2d');
+        enrollmentChart = new Chart(ctx, {
             type: 'doughnut',
             data: { labels: ['Зарегистрированы', 'Не зарегистрированы'], datasets: [{ data: [data.registered_count, notRegistered], backgroundColor: ['#6c5ce7', '#2d2d4a'], borderWidth: 0 }] },
             options: {
                 responsive: true,
-                maintainAspectRatio: true,
-                plugins: { legend: { position: 'bottom', labels: { color: '#e0e0e0' } } },
-                tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw} чел. (${((ctx.raw / data.total_employees) * 100).toFixed(1)}%)` } }
+                plugins: {
+                    legend: { position: 'bottom', labels: { color: '#e0e0e0' } },
+                    tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw} чел. (${((ctx.raw / data.total_employees) * 100).toFixed(1)}%)` } }
+                }
             }
         });
-
-        // Ручная отрисовка процентов на doughnut
-        const originalDraw = enrollmentChart.draw;
-        enrollmentChart.draw = function() {
-            originalDraw.apply(this, arguments);
-            const ctx = this.ctx;
-            const total = data.total_employees;
-            if (total === 0) return;
-            const meta = this.getDatasetMeta(0);
-            const arcs = meta.data;
-            ctx.save();
-            ctx.font = 'bold 14px "Inter", sans-serif';
-            ctx.fillStyle = '#ffffff';
-            ctx.shadowBlur = 0;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            
-            arcs.forEach((arc, i) => {
-                const value = this.data.datasets[0].data[i];
-                const percentage = (value / total) * 100;
-                const label = `${percentage.toFixed(1)}%`;
-                const center = arc.getCenterPoint();
-                ctx.fillStyle = '#ffffff';
-                ctx.shadowBlur = 0;
-                ctx.fillText(label, center.x, center.y);
-            });
-            ctx.restore();
+        // Дожидаемся отрисовки и добавляем проценты поверх
+        setTimeout(() => drawPercentsOnDoughnut(enrollmentChart), 100);
+        // Подписываемся на событие обновления (например, при ресайзе)
+        enrollmentChart.options.responsive = true;
+        const origUpdate = enrollmentChart.update;
+        enrollmentChart.update = function() {
+            origUpdate.apply(this, arguments);
+            setTimeout(() => drawPercentsOnDoughnut(this), 50);
         };
-        enrollmentChart.draw();
     }
 
     function resetFilters() {
@@ -765,10 +713,7 @@
         document.querySelectorAll('.btn-purpose').forEach(btn => btn.classList.remove('active'));
         document.querySelector('.btn-purpose[data-purpose=""]').classList.add('active');
         currentPurpose = '';
-        loadTableData();
-        loadStatistics();
-        loadCharts();
-        updateKicTable();
+        loadTableData(); loadStatistics(); loadCharts(); updateKicTable();
     }
 
     document.querySelectorAll('.btn-purpose').forEach(btn => {
@@ -776,26 +721,12 @@
             document.querySelectorAll('.btn-purpose').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             currentPurpose = btn.getAttribute('data-purpose');
-            loadTableData();
-            loadStatistics();
-            loadCharts();
-            updateKicTable();
+            loadTableData(); loadStatistics(); loadCharts(); updateKicTable();
         });
     });
-
-    document.getElementById('applyFilters').addEventListener('click', () => {
-        loadTableData();
-        loadStatistics();
-        loadCharts();
-        updateKicTable();
-    });
+    document.getElementById('applyFilters').addEventListener('click', () => { loadTableData(); loadStatistics(); loadCharts(); updateKicTable(); });
     document.getElementById('resetFilters').addEventListener('click', resetFilters);
-    document.getElementById('refreshBtn').addEventListener('click', () => {
-        loadTableData();
-        loadStatistics();
-        loadCharts();
-        updateKicTable();
-    });
+    document.getElementById('refreshBtn').addEventListener('click', () => { loadTableData(); loadStatistics(); loadCharts(); updateKicTable(); });
 
     document.getElementById('sendTelegramBtn').addEventListener('click', async function() {
         const btn = this; btn.disabled = true; btn.textContent = '⏳ Отправка...';
@@ -806,7 +737,6 @@
         } catch (err) { alert('Ошибка соединения: ' + err.message); }
         finally { btn.disabled = false; btn.textContent = '📨 Отправить в СберЧат'; }
     });
-
     document.getElementById('exportExcelBtn').addEventListener('click', async function() {
         const filteredData = table.rows({ search: 'applied' }).data().toArray();
         if (filteredData.length === 0) { alert('Нет данных для выгрузки'); return; }
@@ -819,7 +749,6 @@
         } catch (err) { alert('Ошибка соединения: ' + err.message); }
         finally { btn.disabled = false; btn.textContent = '📊 Выгрузить в Excel'; }
     });
-
     document.getElementById('remindKicBtn').addEventListener('click', async function() {
         const btn = this; btn.disabled = true; btn.textContent = '⏳ Отправка...';
         try {
@@ -829,11 +758,8 @@
         } catch (err) { alert('Ошибка соединения: ' + err.message); }
         finally { btn.disabled = false; btn.textContent = '📧 Напомнить руководителям КИЦ'; }
     });
-
     document.getElementById('exportPptxBtn').addEventListener('click', async function() {
-        const btn = this;
-        btn.disabled = true;
-        btn.textContent = '⏳ Создание презентации...';
+        const btn = this; btn.disabled = true; btn.textContent = '⏳ Создание презентации...';
         try {
             const tableContainer = document.getElementById('kicTableContainer');
             if (!tableContainer) throw new Error('Контейнер таблицы не найден');

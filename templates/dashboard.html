@@ -666,36 +666,6 @@
         $('#recordsCounter .total-count').text(filteredCount);
     }
 
-    // Функция для ручной отрисовки процентов на doughnut-диаграмме
-    function drawDoughnutLabels(chart, total) {
-        const canvas = chart.canvas;
-        const ctx = canvas.getContext('2d');
-        const meta = chart.getDatasetMeta(0);
-        const data = chart.data.datasets[0].data;
-        const totalValue = total || data.reduce((a, b) => a + b, 0);
-        
-        ctx.save();
-        ctx.font = 'bold 16px "Inter", sans-serif';
-        ctx.fillStyle = '#ffffff';
-        ctx.shadowBlur = 0;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        for (let i = 0; i < meta.data.length; i++) {
-            const element = meta.data[i];
-            const value = data[i];
-            const percentage = totalValue > 0 ? ((value / totalValue) * 100).toFixed(1) : '0';
-            const text = `${percentage}%`;
-            
-            // Получаем центр сегмента
-            const center = element.getCenterPoint();
-            ctx.fillStyle = '#ffffff';
-            ctx.shadowBlur = 0;
-            ctx.fillText(text, center.x, center.y);
-        }
-        ctx.restore();
-    }
-
     async function loadCharts() {
         const gosb = document.getElementById('gosbSelect').value;
         const city = document.getElementById('kicSelect').value;
@@ -738,39 +708,47 @@
             options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#e0e0e0' } } } }
         });
 
-        // График обученности (doughnut) с ручной отрисовкой процентов
+        // График обученности (doughnut) с ручной отрисовкой процентов поверх
         const notRegistered = data.total_employees - data.registered_count;
         if (enrollmentChart) enrollmentChart.destroy();
         const ctxEnroll = document.getElementById('enrollmentChart').getContext('2d');
         enrollmentChart = new Chart(ctxEnroll, {
             type: 'doughnut',
-            data: { 
-                labels: ['Зарегистрированы', 'Не зарегистрированы'], 
-                datasets: [{ 
-                    data: [data.registered_count, notRegistered], 
-                    backgroundColor: ['#6c5ce7', '#2d2d4a'], 
-                    borderWidth: 0 
-                }] 
-            },
+            data: { labels: ['Зарегистрированы', 'Не зарегистрированы'], datasets: [{ data: [data.registered_count, notRegistered], backgroundColor: ['#6c5ce7', '#2d2d4a'], borderWidth: 0 }] },
             options: {
                 responsive: true,
                 maintainAspectRatio: true,
-                plugins: {
-                    legend: { position: 'bottom', labels: { color: '#e0e0e0' } },
-                    tooltip: { 
-                        callbacks: { 
-                            label: (ctx) => `${ctx.label}: ${ctx.raw} чел. (${((ctx.raw / data.total_employees) * 100).toFixed(1)}%)` 
-                        } 
-                    }
-                }
+                plugins: { legend: { position: 'bottom', labels: { color: '#e0e0e0' } } },
+                tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw} чел. (${((ctx.raw / data.total_employees) * 100).toFixed(1)}%)` } }
             }
         });
 
-        // Рисуем проценты поверх
-        const total = data.registered_count + notRegistered;
+        // Ручная отрисовка процентов на doughnut
+        const originalDraw = enrollmentChart.draw;
         enrollmentChart.draw = function() {
-            Chart.controllers.doughnut.prototype.draw.call(this);
-            drawDoughnutLabels(enrollmentChart, total);
+            originalDraw.apply(this, arguments);
+            const ctx = this.ctx;
+            const total = data.total_employees;
+            if (total === 0) return;
+            const meta = this.getDatasetMeta(0);
+            const arcs = meta.data;
+            ctx.save();
+            ctx.font = 'bold 14px "Inter", sans-serif';
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowBlur = 0;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            arcs.forEach((arc, i) => {
+                const value = this.data.datasets[0].data[i];
+                const percentage = (value / total) * 100;
+                const label = `${percentage.toFixed(1)}%`;
+                const center = arc.getCenterPoint();
+                ctx.fillStyle = '#ffffff';
+                ctx.shadowBlur = 0;
+                ctx.fillText(label, center.x, center.y);
+            });
+            ctx.restore();
         };
         enrollmentChart.draw();
     }
